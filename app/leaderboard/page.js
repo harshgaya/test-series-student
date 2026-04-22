@@ -807,7 +807,7 @@ function LeaderboardSkeleton() {
               <div className="h-3 w-32 rounded bg-slate-100" />
               <div className="h-2 w-20 rounded bg-slate-100" />
             </div>
-            <div className="h-3 w-10 rounded bg-slate-100" />
+            <div className="h-2 w-10 rounded bg-slate-100 " />
           </div>
         ))}
       </div>
