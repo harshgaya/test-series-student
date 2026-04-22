@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
   MdWhatsapp,
@@ -11,65 +11,168 @@ import {
   MdRadioButtonUnchecked,
   MdTimer,
   MdArrowForward,
-  MdShare,
+  MdReplay,
+  MdTrendingUp,
+  MdPeople,
+  MdStar,
 } from "react-icons/md";
 import { SUPPORT_WHATSAPP } from "@/lib/constants";
 
+// ── Score ring ────────────────────────────────────────────────────────────────
 function ScoreRing({ pct }) {
-  const r = 54,
+  const r = 52,
     c = 2 * Math.PI * r;
   const dash = (pct / 100) * c;
   const color = pct >= 70 ? "#16A34A" : pct >= 40 ? "#F97316" : "#DC2626";
+  const bg = pct >= 70 ? "#F0FDF4" : pct >= 40 ? "#FFF7ED" : "#FEF2F2";
+
   return (
-    <svg width="140" height="140" viewBox="0 0 140 140">
-      <circle
-        cx="70"
-        cy="70"
-        r={r}
-        fill="none"
-        stroke="#F3F4F6"
-        strokeWidth="10"
+    <div
+      className="relative flex items-center justify-center"
+      style={{ width: 140, height: 140 }}
+    >
+      <div
+        className="absolute inset-0 rounded-full"
+        style={{ background: bg }}
       />
-      <circle
-        cx="70"
-        cy="70"
-        r={r}
-        fill="none"
-        stroke={color}
-        strokeWidth="10"
-        strokeDasharray={`${dash} ${c}`}
-        strokeDashoffset={c * 0.25}
-        strokeLinecap="round"
-        style={{ transition: "stroke-dasharray 1s ease" }}
-      />
-      <text
-        x="70"
-        y="66"
-        textAnchor="middle"
-        fontSize="26"
-        fontWeight="800"
-        fill={color}
-        fontFamily="Sora, Poppins, sans-serif"
+      <svg
+        width="140"
+        height="140"
+        viewBox="0 0 140 140"
+        className="absolute inset-0 -rotate-90"
       >
-        {pct}%
-      </text>
-      <text
-        x="70"
-        y="84"
-        textAnchor="middle"
-        fontSize="12"
-        fill="#9CA3AF"
-        fontFamily="Poppins, sans-serif"
-      >
-        Score
-      </text>
-    </svg>
+        <circle
+          cx="70"
+          cy="70"
+          r={r}
+          fill="none"
+          stroke="#E5E7EB"
+          strokeWidth="10"
+        />
+        <circle
+          cx="70"
+          cy="70"
+          r={r}
+          fill="none"
+          stroke={color}
+          strokeWidth="10"
+          strokeDasharray={`${dash} ${c}`}
+          strokeLinecap="round"
+          style={{ transition: "stroke-dasharray 1.2s ease" }}
+        />
+      </svg>
+      <div className="relative text-center">
+        <p className="text-3xl font-extrabold leading-none" style={{ color }}>
+          {pct}%
+        </p>
+        <p className="mt-1 text-[11px] font-semibold text-slate-400">Score</p>
+      </div>
+    </div>
   );
 }
 
+// ── Grade label ───────────────────────────────────────────────────────────────
+function getGrade(pct) {
+  if (pct >= 90)
+    return {
+      label: "Outstanding!",
+      emoji: "🏆",
+      color: "text-emerald-600",
+      bg: "bg-emerald-50",
+      border: "border-emerald-200",
+    };
+  if (pct >= 70)
+    return {
+      label: "Great Job!",
+      emoji: "🎯",
+      color: "text-teal-700",
+      bg: "bg-teal-50",
+      border: "border-teal-200",
+    };
+  if (pct >= 50)
+    return {
+      label: "Good Effort!",
+      emoji: "💪",
+      color: "text-orange-600",
+      bg: "bg-orange-50",
+      border: "border-orange-200",
+    };
+  return {
+    label: "Keep Practicing!",
+    emoji: "📚",
+    color: "text-red-600",
+    bg: "bg-red-50",
+    border: "border-red-200",
+  };
+}
+
+// ── Stat card ─────────────────────────────────────────────────────────────────
+function StatCard({ icon, label, value, bg, textColor }) {
+  return (
+    <div
+      className={`flex flex-col items-center justify-center rounded-2xl border py-5 px-3 text-center ${bg}`}
+    >
+      <div className="mb-2">{icon}</div>
+      <p className={`text-2xl font-extrabold leading-none ${textColor}`}>
+        {value}
+      </p>
+      <p className="mt-1.5 text-[11px] font-semibold text-slate-500">{label}</p>
+    </div>
+  );
+}
+
+// ── Subject bar ───────────────────────────────────────────────────────────────
+function SubjectBar({ subject, data }) {
+  const acc =
+    data.total > 0 ? Math.round((data.correct / data.total) * 100) : 0;
+  const color =
+    acc >= 70 ? "bg-emerald-500" : acc >= 40 ? "bg-orange-500" : "bg-red-500";
+  const text =
+    acc >= 70
+      ? "text-emerald-700"
+      : acc >= 40
+        ? "text-orange-600"
+        : "text-red-600";
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <p className="text-sm font-semibold text-slate-800">{subject}</p>
+        <div className="flex items-center gap-3">
+          <span className="text-[12px] text-slate-400">
+            {data.correct}/{data.total}
+          </span>
+          <span className={`min-w-[36px] text-right text-sm font-bold ${text}`}>
+            {acc}%
+          </span>
+        </div>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+        <div
+          className={`h-2 rounded-full transition-all duration-1000 ${color}`}
+          style={{ width: `${acc}%` }}
+        />
+      </div>
+      <div className="mt-1.5 flex gap-3 text-[11px] text-slate-400">
+        <span className="flex items-center gap-1">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          {data.correct} correct
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-red-400" />
+          {data.wrong} wrong
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-slate-300" />
+          {data.skipped || data.total - data.correct - data.wrong} skipped
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
 export default function ResultPage() {
   const { id } = useParams();
-  const router = useRouter();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -84,40 +187,26 @@ export default function ResultPage() {
 
   if (loading)
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "var(--gray-50)",
-        }}
-      >
-        <div
-          style={{
-            width: 40,
-            height: 40,
-            border: "3px solid var(--teal-100)",
-            borderTop: "3px solid var(--primary)",
-            borderRadius: "50%",
-            animation: "spin 1s linear infinite",
-          }}
-        />
-        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-teal-100 border-t-teal-600" />
       </div>
     );
 
   if (!data)
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <p>Result not found</p>
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <p className="text-4xl">😕</p>
+          <p className="mt-3 text-lg font-bold text-slate-700">
+            Result not found
+          </p>
+          <Link
+            href="/browse"
+            className="mt-4 inline-block text-sm font-semibold text-teal-600 underline"
+          >
+            Browse Tests
+          </Link>
+        </div>
       </div>
     );
 
@@ -127,452 +216,339 @@ export default function ResultPage() {
   const pct = total > 0 ? Math.round((score / total) * 100) : 0;
   const timeSecs = attempt.timeTakenSecs || 0;
   const timeStr =
-    timeSecs > 0 ? `${Math.floor(timeSecs / 60)}m ${timeSecs % 60}s` : "—";
+    timeSecs > 0 ? `${Math.floor(timeSecs / 60)}m ${timeSecs % 60}s` : null;
+  const grade = getGrade(pct);
 
-  const grade =
-    pct >= 90
-      ? { label: "Outstanding! 🏆", color: "#16A34A" }
-      : pct >= 70
-        ? { label: "Great Job! 🎯", color: "#0D9488" }
-        : pct >= 50
-          ? { label: "Good Effort! 💪", color: "#F97316" }
-          : { label: "Keep Practicing! 📚", color: "#DC2626" };
+  // ── Deduplicate leaderboard by student ID ─────────────────────────────────
+  const seen = new Set();
+  const dedupedLeaderboard = (leaderboard || [])
+    .filter((entry) => {
+      const sid = entry.student?.id || entry.studentId;
+      if (!sid || seen.has(sid)) return false;
+      seen.add(sid);
+      return true;
+    })
+    .sort((a, b) => Number(b.score) - Number(a.score));
+
+  // Find current student's rank in deduped board
+  const myRank =
+    attempt.rank ||
+    dedupedLeaderboard.findIndex((e) => e.student?.id === attempt.studentId) +
+      1 ||
+    null;
 
   function shareWhatsApp() {
-    const msg = `I scored ${score}/${total} (${pct}%) in ${attempt.test?.title || "a test"} on IIT NEET!\nRank: #${attempt.rank || "—"}\nPractice at iitneet.in`;
+    const msg = `I scored ${score}/${total} (${pct}%) in "${attempt.test?.title || "a test"}" on IITNEET!\nRank: #${myRank || "—"}\nPractice at iitneet.in 📚`;
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`);
   }
 
+  const MEDALS = ["🥇", "🥈", "🥉"];
+
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "var(--gray-50)",
-        fontFamily: "var(--font-body)",
-      }}
-    >
-      {/* Header */}
-      <div
-        style={{
-          background:
-            "linear-gradient(135deg, var(--teal-700) 0%, #0891B2 100%)",
-          padding: "28px 20px 80px",
-        }}
-      >
-        <div className="container">
+    <div className="min-h-screen bg-slate-50">
+      {/* ── HERO ── */}
+      <div className="bg-gradient-to-br from-teal-700 via-teal-600 to-cyan-600">
+        <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
           <Link
             href="/browse"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              color: "rgba(255,255,255,0.8)",
-              textDecoration: "none",
-              fontSize: 13,
-              marginBottom: 16,
-            }}
+            className="mb-6 inline-flex items-center gap-1.5 text-sm font-semibold text-white/65 transition hover:text-white/90 no-underline"
           >
-            <MdArrowBack /> Back
+            <MdArrowBack size={16} /> Back to Browse
           </Link>
-          <p
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: "rgba(255,255,255,0.7)",
-              marginBottom: 4,
-            }}
-          >
+
+          <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.18em] text-white/60">
             Test Result
           </p>
-          <h1
-            style={{
-              fontFamily: "var(--font-display)",
-              fontSize: "clamp(18px,3vw,26px)",
-              fontWeight: 700,
-              color: "white",
-            }}
-          >
-            {attempt.test?.title}
+          <h1 className="text-xl font-extrabold leading-snug text-white sm:text-2xl lg:text-3xl">
+            {attempt.test?.title || "Test Result"}
           </h1>
+          {attempt.test?.exam?.name && (
+            <span className="mt-3 inline-block rounded-full bg-white/15 px-3 py-1 text-[12px] font-semibold text-white/85">
+              {attempt.test.exam.name}
+            </span>
+          )}
         </div>
       </div>
 
-      <div
-        className="container"
-        style={{ padding: "0 20px", marginTop: -56, paddingBottom: 60 }}
-      >
-        {/* Score card */}
-        <div
-          style={{
-            background: "white",
-            borderRadius: "var(--r-2xl)",
-            border: "1px solid var(--border)",
-            padding: "clamp(24px,4vw,40px)",
-            marginBottom: 20,
-            boxShadow: "var(--shadow-lg)",
-          }}
-        >
+      <div className="mx-auto max-w-4xl px-4 pb-16 sm:px-6 lg:px-8">
+        {/* ── SCORE CARD ── */}
+        <div className="-mt-6 mb-5 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl">
+          {/* Grade banner */}
           <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "clamp(20px,4vw,48px)",
-              flexWrap: "wrap",
-              justifyContent: "center",
-            }}
+            className={`flex items-center gap-3 border-b px-6 py-4 ${grade.bg} ${grade.border}`}
           >
-            {/* Ring */}
-            <div style={{ flexShrink: 0 }}>
+            <span className="text-2xl">{grade.emoji}</span>
+            <p className={`text-base font-extrabold ${grade.color}`}>
+              {grade.label}
+            </p>
+            {timeStr && (
+              <div className="ml-auto flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1 text-[12px] font-semibold text-slate-600">
+                <MdTimer size={14} /> {timeStr}
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-8 p-6 sm:gap-12 sm:p-8">
+            {/* Score ring */}
+            <div className="flex-shrink-0 mx-auto sm:mx-0">
               <ScoreRing pct={pct} />
             </div>
 
-            {/* Score details */}
-            <div style={{ flex: 1, minWidth: 200 }}>
-              <p
-                style={{
-                  fontSize: "clamp(13px,2vw,15px)",
-                  fontWeight: 600,
-                  color: grade.color,
-                  marginBottom: 4,
-                }}
-              >
-                {grade.label}
-              </p>
-              <p
-                style={{
-                  fontFamily: "var(--font-display)",
-                  fontSize: "clamp(36px,6vw,56px)",
-                  fontWeight: 800,
-                  color: "var(--gray-900)",
-                  lineHeight: 1,
-                  marginBottom: 8,
-                }}
-              >
+            {/* Score + rank */}
+            <div className="flex-1 min-w-[180px]">
+              <p className="text-5xl font-extrabold leading-none text-slate-900 sm:text-6xl">
                 {score}
-                <span
-                  style={{
-                    fontSize: "clamp(18px,3vw,28px)",
-                    color: "var(--text-muted)",
-                    fontWeight: 400,
-                  }}
-                >
+                <span className="text-2xl font-normal text-slate-400 sm:text-3xl">
                   {" "}
                   / {total}
                 </span>
               </p>
-              {timeSecs > 0 && (
-                <div
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 6,
-                    padding: "5px 12px",
-                    background: "var(--gray-100)",
-                    borderRadius: "var(--r-full)",
-                    fontSize: 13,
-                    color: "var(--text-secondary)",
-                  }}
-                >
-                  <MdTimer style={{ fontSize: 16 }} /> Time taken: {timeStr}
-                </div>
-              )}
+
+              <div className="mt-4 flex flex-wrap gap-3">
+                {myRank && (
+                  <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5">
+                    <MdEmojiEvents size={18} className="text-amber-500" />
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-amber-600">
+                        Rank
+                      </p>
+                      <p className="text-lg font-extrabold leading-none text-amber-800">
+                        #{myRank}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {attempt.tabSwitchCount > 0 && (
+                  <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5">
+                    <p className="text-[12px] font-semibold text-red-600">
+                      ⚠️ {attempt.tabSwitchCount} tab switch
+                      {attempt.tabSwitchCount > 1 ? "es" : ""}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
           {/* Stats grid */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(4, 1fr)",
-              gap: 12,
-              marginTop: 28,
-            }}
-          >
-            {[
-              {
-                icon: (
-                  <MdCheckCircle style={{ color: "#16A34A", fontSize: 22 }} />
-                ),
-                label: "Correct",
-                value: attempt.correctCount,
-                bg: "#F0FDF4",
-                border: "#BBF7D0",
-              },
-              {
-                icon: <MdCancel style={{ color: "#DC2626", fontSize: 22 }} />,
-                label: "Wrong",
-                value: attempt.wrongCount,
-                bg: "#FEF2F2",
-                border: "#FECACA",
-              },
-              {
-                icon: (
-                  <MdRadioButtonUnchecked
-                    style={{ color: "#9CA3AF", fontSize: 22 }}
-                  />
-                ),
-                label: "Skipped",
-                value: attempt.skippedCount,
-                bg: "var(--gray-50)",
-                border: "var(--border)",
-              },
-              {
-                icon: (
-                  <MdEmojiEvents style={{ color: "#F97316", fontSize: 22 }} />
-                ),
-                label: "Rank",
-                value: attempt.rank ? `#${attempt.rank}` : "—",
-                bg: "#FFF7ED",
-                border: "#FED7AA",
-              },
-            ].map((s) => (
-              <div
-                key={s.label}
-                style={{
-                  textAlign: "center",
-                  padding: "clamp(12px,2vw,20px) 8px",
-                  background: s.bg,
-                  border: `1px solid ${s.border}`,
-                  borderRadius: "var(--r-xl)",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "center",
-                    marginBottom: 8,
-                  }}
-                >
-                  {s.icon}
-                </div>
-                <p
-                  style={{
-                    fontFamily: "var(--font-display)",
-                    fontSize: "clamp(20px,3vw,28px)",
-                    fontWeight: 800,
-                    lineHeight: 1,
-                    color: "var(--gray-900)",
-                  }}
-                >
-                  {s.value}
-                </p>
-                <p
-                  style={{
-                    fontSize: 11,
-                    color: "var(--text-muted)",
-                    marginTop: 4,
-                    fontWeight: 500,
-                  }}
-                >
-                  {s.label}
-                </p>
-              </div>
-            ))}
+          <div className="grid grid-cols-2 gap-3 px-6 pb-6 sm:grid-cols-4">
+            <StatCard
+              icon={<MdCheckCircle size={22} className="text-emerald-500" />}
+              label="Correct"
+              value={attempt.correctCount ?? "—"}
+              bg="bg-emerald-50 border-emerald-100"
+              textColor="text-emerald-700"
+            />
+            <StatCard
+              icon={<MdCancel size={22} className="text-red-500" />}
+              label="Wrong"
+              value={attempt.wrongCount ?? "—"}
+              bg="bg-red-50 border-red-100"
+              textColor="text-red-700"
+            />
+            <StatCard
+              icon={
+                <MdRadioButtonUnchecked size={22} className="text-slate-400" />
+              }
+              label="Skipped"
+              value={attempt.skippedCount ?? "—"}
+              bg="bg-slate-50 border-slate-200"
+              textColor="text-slate-700"
+            />
+            <StatCard
+              icon={<MdTrendingUp size={22} className="text-teal-600" />}
+              label="Accuracy"
+              value={
+                attempt.correctCount &&
+                attempt.correctCount + attempt.wrongCount > 0
+                  ? `${Math.round((attempt.correctCount / (attempt.correctCount + attempt.wrongCount)) * 100)}%`
+                  : "—"
+              }
+              bg="bg-teal-50 border-teal-100"
+              textColor="text-teal-700"
+            />
           </div>
 
-          {/* Actions */}
-          <div
-            style={{
-              display: "flex",
-              gap: 12,
-              marginTop: 24,
-              flexWrap: "wrap",
-            }}
-          >
+          {/* Action buttons */}
+          <div className="flex flex-wrap gap-3 border-t border-slate-100 px-6 py-5">
             <button
               onClick={shareWhatsApp}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "11px 22px",
-                background: "#22C55E",
-                color: "white",
-                border: "none",
-                borderRadius: "var(--r-full)",
-                fontSize: 14,
-                fontWeight: 600,
-                cursor: "pointer",
-                fontFamily: "var(--font-body)",
-              }}
+              className="flex items-center gap-2 rounded-xl bg-green-500 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-green-600"
             >
-              <MdWhatsapp style={{ fontSize: 18 }} /> Share Result
+              <MdWhatsapp size={18} /> Share Result
             </button>
             <Link
               href={`/solutions/${id}`}
-              className="btn-outline"
-              style={{ padding: "11px 22px", fontSize: 14 }}
+              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 no-underline"
             >
-              View Solutions <MdArrowForward />
+              View Solutions <MdArrowForward size={16} />
             </Link>
+            {attempt.test?.id && (
+              <Link
+                href={`/test/${attempt.test.id}`}
+                className="flex items-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-5 py-2.5 text-sm font-semibold text-teal-700 transition hover:bg-teal-100 no-underline"
+              >
+                <MdReplay size={16} /> Reattempt
+              </Link>
+            )}
           </div>
         </div>
 
-        {/* Subject breakdown */}
-        {Object.keys(subjectBreakdown).length > 0 && (
-          <div
-            style={{
-              background: "white",
-              borderRadius: "var(--r-xl)",
-              border: "1px solid var(--border)",
-              padding: "clamp(20px,4vw,32px)",
-              marginBottom: 20,
-            }}
-          >
-            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>
-              Subject-wise Analysis
-            </h3>
-            {Object.entries(subjectBreakdown).map(([subject, s]) => {
-              const acc =
-                s.total > 0 ? Math.round((s.correct / s.total) * 100) : 0;
-              const barColor =
-                acc >= 70 ? "#16A34A" : acc >= 40 ? "#F97316" : "#DC2626";
-              return (
-                <div key={subject} style={{ marginBottom: 20 }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginBottom: 8,
-                    }}
-                  >
-                    <p
-                      style={{
-                        fontSize: 14,
-                        fontWeight: 600,
-                        color: "var(--gray-800)",
-                      }}
-                    >
-                      {subject}
-                    </p>
-                    <div
-                      style={{ display: "flex", gap: 16, alignItems: "center" }}
-                    >
-                      <span
-                        style={{ fontSize: 12, color: "var(--text-muted)" }}
-                      >
-                        {s.correct}/{s.total} correct
-                      </span>
-                      <span
-                        style={{
-                          fontSize: 14,
-                          fontWeight: 700,
-                          color: barColor,
-                        }}
-                      >
-                        {acc}%
-                      </span>
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      height: 8,
-                      background: "var(--gray-100)",
-                      borderRadius: 99,
-                      overflow: "hidden",
-                    }}
-                  >
-                    <div
-                      style={{
-                        height: "100%",
-                        width: `${acc}%`,
-                        background: barColor,
-                        borderRadius: 99,
-                        transition: "width 0.8s ease",
-                      }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
+        {/* ── SUBJECT BREAKDOWN ── */}
+        {Object.keys(subjectBreakdown || {}).length > 0 && (
+          <div className="mb-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+            <div className="mb-6 flex items-center gap-2">
+              <MdTrendingUp size={18} className="text-teal-600" />
+              <h2 className="text-base font-bold text-slate-800">
+                Subject-wise Analysis
+              </h2>
+            </div>
+            <div className="space-y-6">
+              {Object.entries(subjectBreakdown).map(([subject, s]) => (
+                <SubjectBar key={subject} subject={subject} data={s} />
+              ))}
+            </div>
           </div>
         )}
 
-        {/* Leaderboard */}
-        {leaderboard.length > 0 && (
-          <div
-            style={{
-              background: "white",
-              borderRadius: "var(--r-xl)",
-              border: "1px solid var(--border)",
-              padding: "clamp(20px,4vw,32px)",
-            }}
-          >
-            <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>
-              🏆 Leaderboard
-            </h3>
-            {leaderboard.slice(0, 10).map((entry, i) => {
-              const medals = ["🥇", "🥈", "🥉"];
-              const isMe = attempt.rank && i + 1 === attempt.rank;
-              return (
-                <div
-                  key={i}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 14,
-                    padding: "12px 16px",
-                    borderRadius: "var(--r-lg)",
-                    marginBottom: 6,
-                    background: isMe
-                      ? "var(--teal-50)"
-                      : i % 2 === 0
-                        ? "var(--gray-50)"
-                        : "white",
-                    border: isMe
-                      ? "1.5px solid var(--teal-200)"
-                      : "1.5px solid transparent",
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: i < 3 ? 22 : 14,
-                      fontWeight: 700,
-                      width: 32,
-                      textAlign: "center",
-                      color: "var(--text-muted)",
-                      flexShrink: 0,
-                    }}
+        {/* ── LEADERBOARD ── */}
+        {dedupedLeaderboard.length > 0 && (
+          <div className="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+            <div className="flex items-center gap-2 border-b border-slate-100 px-6 py-4">
+              <MdEmojiEvents size={18} className="text-amber-500" />
+              <h2 className="text-base font-bold text-slate-800">
+                Leaderboard
+              </h2>
+              <span className="ml-auto flex items-center gap-1 text-[12px] text-slate-400">
+                <MdPeople size={14} /> {dedupedLeaderboard.length} students
+              </span>
+            </div>
+
+            <div className="divide-y divide-slate-50">
+              {dedupedLeaderboard.slice(0, 10).map((entry, i) => {
+                const entryPct =
+                  entry.totalMarks > 0
+                    ? Math.round((Number(entry.score) / entry.totalMarks) * 100)
+                    : 0;
+                const isMe = myRank && i + 1 === myRank;
+                const isTop3 = i < 3;
+
+                return (
+                  <div
+                    key={entry.id || i}
+                    className={`flex items-center gap-3 px-5 py-3.5 transition ${
+                      isMe
+                        ? "bg-teal-50"
+                        : isTop3
+                          ? "bg-amber-50/40"
+                          : "hover:bg-slate-50"
+                    }`}
                   >
-                    {i < 3 ? medals[i] : i + 1}
-                  </span>
-                  <p
-                    style={{
-                      flex: 1,
-                      fontSize: 14,
-                      fontWeight: isMe ? 700 : 500,
-                      color: isMe ? "var(--teal-700)" : "var(--text-primary)",
-                    }}
-                  >
-                    {entry.student?.name || `Student ${i + 1}`}
-                    {isMe ? " (You)" : ""}
-                  </p>
-                  <p
-                    style={{
-                      fontSize: 15,
-                      fontWeight: 700,
-                      color: i === 0 ? "#F97316" : "var(--text-primary)",
-                    }}
-                  >
-                    {Number(entry.score)}
-                    <span
-                      style={{
-                        fontSize: 12,
-                        color: "var(--text-muted)",
-                        fontWeight: 400,
-                      }}
+                    {/* Rank */}
+                    <div className="flex w-8 flex-shrink-0 items-center justify-center">
+                      {isTop3 ? (
+                        <span className="text-xl">{MEDALS[i]}</span>
+                      ) : (
+                        <span className="text-sm font-bold text-slate-400">
+                          {i + 1}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Avatar */}
+                    <div
+                      className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-sm font-extrabold ${
+                        isMe
+                          ? "bg-teal-600 text-white"
+                          : "bg-slate-100 text-slate-600"
+                      }`}
                     >
-                      /{entry.totalMarks}
+                      {(entry.student?.name || "S")[0].toUpperCase()}
+                    </div>
+
+                    {/* Name */}
+                    <div className="flex-1 min-w-0">
+                      <p
+                        className={`truncate text-sm font-semibold ${isMe ? "text-teal-800" : "text-slate-800"}`}
+                      >
+                        {entry.student?.name || `Student ${i + 1}`}
+                        {isMe && (
+                          <span className="ml-2 rounded-full bg-teal-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                            You
+                          </span>
+                        )}
+                      </p>
+                    </div>
+
+                    {/* Score + bar */}
+                    <div className="flex flex-shrink-0 items-center gap-3">
+                      <div className="hidden w-20 sm:block">
+                        <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                          <div
+                            className={`h-1.5 rounded-full ${entryPct >= 70 ? "bg-emerald-500" : entryPct >= 40 ? "bg-orange-500" : "bg-red-400"}`}
+                            style={{ width: `${entryPct}%` }}
+                          />
+                        </div>
+                        <p className="mt-0.5 text-right text-[10px] text-slate-400">
+                          {entryPct}%
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p
+                          className={`text-sm font-extrabold ${i === 0 ? "text-amber-600" : isMe ? "text-teal-700" : "text-slate-800"}`}
+                        >
+                          {Number(entry.score)}
+                        </p>
+                        <p className="text-[10px] text-slate-400">
+                          /{entry.totalMarks}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* My rank if not in top 10 */}
+            {myRank && myRank > 10 && (
+              <div className="border-t border-dashed border-teal-200 bg-teal-50 px-5 py-3.5">
+                <div className="flex items-center gap-3">
+                  <span className="w-8 text-center text-sm font-bold text-teal-600">
+                    #{myRank}
+                  </span>
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-teal-600 text-sm font-extrabold text-white">
+                    {(attempt.student?.name || "Y")[0]}
+                  </div>
+                  <p className="flex-1 text-sm font-semibold text-teal-800">
+                    {attempt.student?.name || "You"}
+                    <span className="ml-2 rounded-full bg-teal-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                      You
+                    </span>
+                  </p>
+                  <p className="text-sm font-extrabold text-teal-700">
+                    {score}
+                    <span className="text-[11px] font-normal text-teal-500">
+                      /{total}
                     </span>
                   </p>
                 </div>
-              );
-            })}
+              </div>
+            )}
+
+            {/* Footer */}
+            <div className="border-t border-slate-100 px-6 py-4 text-center">
+              <a
+                href={`https://wa.me/${SUPPORT_WHATSAPP}?text=Hi, need help with test: ${attempt.test?.title || id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-400 transition hover:text-green-600 no-underline"
+              >
+                <MdWhatsapp size={15} /> Need help? Chat with us
+              </a>
+            </div>
           </div>
         )}
       </div>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   );
 }

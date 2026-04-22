@@ -4,11 +4,11 @@ import { MdClose, MdFlag } from "react-icons/md";
 import toast from "react-hot-toast";
 
 const REPORT_TYPES = [
-  { value: "wrong_answer", label: "Wrong answer marked" },
-  { value: "typo", label: "Question has typo" },
-  { value: "image_issue", label: "Image not loading" },
-  { value: "unclear", label: "Unclear question" },
-  { value: "other", label: "Other" },
+  { value: "wrong_answer", label: "Wrong answer marked", emoji: "❌" },
+  { value: "typo", label: "Question has typo", emoji: "✏️" },
+  { value: "image_issue", label: "Image not loading", emoji: "🖼️" },
+  { value: "unclear", label: "Unclear question", emoji: "❓" },
+  { value: "other", label: "Other issue", emoji: "💬" },
 ];
 
 export default function ReportModal({ questionId, onClose }) {
@@ -40,154 +40,80 @@ export default function ReportModal({ questionId, onClose }) {
 
   return (
     <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.55)",
-        zIndex: 300,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 20,
-      }}
+      className="fixed inset-0 z-[300] flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+      onClick={onClose}
     >
       <div
-        style={{
-          background: "white",
-          borderRadius: 16,
-          width: "100%",
-          maxWidth: 400,
-          overflow: "hidden",
-          boxShadow: "0 20px 40px rgba(0,0,0,0.15)",
-        }}
+        className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
       >
-        <div
-          style={{
-            padding: "18px 20px",
-            borderBottom: "1px solid #E5E7EB",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <MdFlag style={{ color: "#DC2626", fontSize: 20 }} />
-            <p style={{ fontSize: 16, fontWeight: 700, color: "#111827" }}>
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-50">
+              <MdFlag size={16} className="text-red-500" />
+            </div>
+            <p className="text-[15px] font-bold text-slate-900">
               Report Question
             </p>
           </div>
           <button
             onClick={onClose}
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              fontSize: 22,
-              color: "#9CA3AF",
-              display: "flex",
-              padding: 4,
-            }}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
           >
-            <MdClose />
+            <MdClose size={18} />
           </button>
         </div>
 
-        <div style={{ padding: 20 }}>
-          <p
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: "#6B7280",
-              marginBottom: 12,
-            }}
-          >
+        <div className="p-5">
+          <p className="mb-3 text-[12px] font-semibold uppercase tracking-wide text-slate-400">
             What is the issue?
           </p>
 
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 8,
-              marginBottom: 16,
-            }}
-          >
+          {/* Report type options */}
+          <div className="mb-4 space-y-2">
             {REPORT_TYPES.map((t) => (
               <button
                 key={t.value}
                 onClick={() => setType(t.value)}
-                style={{
-                  textAlign: "left",
-                  padding: "10px 14px",
-                  borderRadius: 8,
-                  border: `2px solid ${type === t.value ? "#DC2626" : "#E5E7EB"}`,
-                  background: type === t.value ? "#FEF2F2" : "white",
-                  color: type === t.value ? "#DC2626" : "#374151",
-                  fontSize: 14,
-                  fontWeight: type === t.value ? 600 : 400,
-                  cursor: "pointer",
-                  fontFamily: "Poppins, sans-serif",
-                  transition: "all 0.15s",
-                }}
+                className={`flex w-full items-center gap-3 rounded-xl border-2 px-4 py-2.5 text-left text-sm transition-all ${
+                  type === t.value
+                    ? "border-red-400 bg-red-50 font-semibold text-red-700"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                }`}
               >
+                <span className="text-base">{t.emoji}</span>
                 {t.label}
               </button>
             ))}
           </div>
 
+          {/* Details textarea */}
           <textarea
             placeholder="Additional details (optional)"
             value={description}
             onChange={(e) => setDesc(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "10px 14px",
-              minHeight: 80,
-              border: "1.5px solid #E5E7EB",
-              borderRadius: 8,
-              fontFamily: "Poppins, sans-serif",
-              fontSize: 14,
-              color: "#111827",
-              resize: "vertical",
-              outline: "none",
-              marginBottom: 16,
-            }}
+            rows={3}
+            className="mb-4 w-full resize-none rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-teal-400 focus:ring-2 focus:ring-teal-100"
           />
 
-          <div style={{ display: "flex", gap: 10 }}>
+          {/* Actions */}
+          <div className="flex gap-2">
             <button
               onClick={onClose}
-              style={{
-                flex: 1,
-                padding: 11,
-                borderRadius: 99,
-                border: "2px solid #0D9488",
-                background: "white",
-                color: "#0D9488",
-                fontSize: 14,
-                fontWeight: 600,
-                cursor: "pointer",
-                fontFamily: "Poppins, sans-serif",
-              }}
+              className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
             >
               Cancel
             </button>
             <button
               onClick={handleSubmit}
               disabled={loading || !type}
-              style={{
-                flex: 1,
-                padding: 11,
-                borderRadius: 99,
-                border: "none",
-                background: !type ? "#F3F4F6" : "#DC2626",
-                color: !type ? "#9CA3AF" : "white",
-                fontSize: 14,
-                fontWeight: 600,
-                cursor: !type ? "not-allowed" : "pointer",
-                fontFamily: "Poppins, sans-serif",
-                transition: "all 0.15s",
-              }}
+              className={`flex-1 rounded-xl py-2.5 text-sm font-bold text-white transition ${
+                !type || loading
+                  ? "cursor-not-allowed bg-slate-200 text-slate-400"
+                  : "bg-red-500 hover:bg-red-600 shadow-sm shadow-red-500/25"
+              }`}
             >
               {loading ? "Submitting..." : "Submit Report"}
             </button>

@@ -11,13 +11,17 @@ import {
   MdBookmark,
   MdBookmarkBorder,
   MdFlag,
+  MdVolumeUp,
+  MdPlayCircle,
+  MdLightbulb,
 } from "react-icons/md";
 
+// ── Math renderer ─────────────────────────────────────────────────────────────
 function renderMath(value, katex) {
   if (!value || !katex) return value || "";
   try {
-    let result = value;
-    result = result.replace(/\$\$([^$]+)\$\$/g, (_, m) => {
+    let r = value;
+    r = r.replace(/\$\$([^$]+)\$\$/g, (_, m) => {
       try {
         return katex.renderToString(m.trim(), {
           throwOnError: false,
@@ -29,7 +33,7 @@ function renderMath(value, katex) {
         return m;
       }
     });
-    result = result.replace(/\$([^$\n]+)\$/g, (_, m) => {
+    r = r.replace(/\$([^$\n]+)\$/g, (_, m) => {
       try {
         return katex.renderToString(m.trim(), {
           throwOnError: false,
@@ -41,9 +45,9 @@ function renderMath(value, katex) {
         return m;
       }
     });
-    if (!result.includes("$") && /\\[a-zA-Z]/.test(result)) {
+    if (!r.includes("$") && /\\[a-zA-Z]/.test(r)) {
       try {
-        return katex.renderToString(result.trim(), {
+        return katex.renderToString(r.trim(), {
           throwOnError: false,
           displayMode: false,
           output: "html",
@@ -51,13 +55,321 @@ function renderMath(value, katex) {
         });
       } catch {}
     }
-    result = result.replace(/\n/g, "<br/>");
-    return result;
+    return r.replace(/\n/g, "<br/>");
   } catch {
     return value;
   }
 }
 
+function MathText({ text, katex, className = "" }) {
+  if (!katex) return <span className={className}>{text}</span>;
+  return (
+    <span
+      className={className}
+      dangerouslySetInnerHTML={{ __html: renderMath(text, katex) }}
+    />
+  );
+}
+
+// ── Filter tabs ───────────────────────────────────────────────────────────────
+const FILTERS = [
+  { value: "all", label: "All", color: "teal" },
+  { value: "correct", label: "Correct", color: "emerald" },
+  { value: "wrong", label: "Wrong", color: "red" },
+  { value: "skipped", label: "Skipped", color: "slate" },
+];
+
+// ── Question card ─────────────────────────────────────────────────────────────
+function QuestionCard({
+  q,
+  qNum,
+  answer,
+  isBookmarked,
+  onBookmark,
+  onReport,
+  katex,
+}) {
+  const [expanded, setExpanded] = useState(true);
+
+  const isCorrect = answer?.isCorrect === true;
+  const hasAnswer =
+    answer?.selectedOption ||
+    answer?.integerAnswer ||
+    answer?.selectedOptions?.length;
+  const isSkipped = !hasAnswer;
+  const isWrong = !isCorrect && !isSkipped;
+
+  const statusConfig = isCorrect
+    ? {
+        label: "Correct",
+        icon: <MdCheckCircle size={18} />,
+        headerBg: "bg-emerald-50",
+        headerText: "text-emerald-700",
+        border: "border-emerald-200",
+        topBar: "bg-emerald-500",
+      }
+    : isSkipped
+      ? {
+          label: "Skipped",
+          icon: <MdRadioButtonUnchecked size={18} />,
+          headerBg: "bg-slate-50",
+          headerText: "text-slate-500",
+          border: "border-slate-200",
+          topBar: "bg-slate-300",
+        }
+      : {
+          label: "Wrong",
+          icon: <MdCancel size={18} />,
+          headerBg: "bg-red-50",
+          headerText: "text-red-600",
+          border: "border-red-200",
+          topBar: "bg-red-500",
+        };
+
+  return (
+    <div
+      className={`overflow-hidden rounded-2xl border bg-white shadow-sm transition-shadow hover:shadow-md ${statusConfig.border}`}
+    >
+      {/* Top colour bar */}
+      <div className={`h-1 w-full ${statusConfig.topBar}`} />
+
+      {/* Card header */}
+      <div
+        className={`flex items-center justify-between gap-3 px-5 py-3 ${statusConfig.headerBg}`}
+      >
+        <div className="flex items-center gap-2">
+          <span className={statusConfig.headerText}>{statusConfig.icon}</span>
+          <span className={`text-sm font-bold ${statusConfig.headerText}`}>
+            {statusConfig.label}
+          </span>
+          <span className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-bold text-slate-500">
+            Q{qNum}
+          </span>
+          {q.chapter?.name && (
+            <span className="hidden text-[11px] text-slate-400 sm:inline">
+              · {q.chapter.name}
+            </span>
+          )}
+          {q.difficulty && (
+            <span
+              className={`hidden rounded-full px-2 py-0.5 text-[10px] font-bold sm:inline ${
+                q.difficulty === "EASY"
+                  ? "bg-emerald-100 text-emerald-700"
+                  : q.difficulty === "HARD"
+                    ? "bg-red-100 text-red-700"
+                    : "bg-amber-100 text-amber-700"
+              }`}
+            >
+              {q.difficulty}
+            </span>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => onBookmark(q.id)}
+            title={isBookmarked ? "Remove bookmark" : "Bookmark"}
+            className={`flex h-8 w-8 items-center justify-center rounded-full transition hover:bg-white/70 ${
+              isBookmarked ? "text-teal-600" : "text-slate-400"
+            }`}
+          >
+            {isBookmarked ? (
+              <MdBookmark size={18} />
+            ) : (
+              <MdBookmarkBorder size={18} />
+            )}
+          </button>
+          <button
+            onClick={() => onReport(q.id)}
+            title="Report issue"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition hover:bg-white/70 hover:text-red-500"
+          >
+            <MdFlag size={16} />
+          </button>
+          <button
+            onClick={() => setExpanded((e) => !e)}
+            className="ml-1 rounded-full bg-white/70 px-2.5 py-1 text-[11px] font-semibold text-slate-500 transition hover:bg-white"
+          >
+            {expanded ? "Hide" : "Show"}
+          </button>
+        </div>
+      </div>
+
+      {/* Card body */}
+      {expanded && (
+        <div className="p-5 sm:p-6">
+          {/* Question image */}
+          {q.questionImageUrl && (
+            <img
+              src={q.questionImageUrl}
+              alt=""
+              className="mb-4 max-h-52 rounded-xl object-contain"
+            />
+          )}
+
+          {/* Question text */}
+          <MathText
+            text={q.questionText}
+            katex={katex}
+            className="mb-5 block text-[15px] leading-[1.9] text-slate-800"
+          />
+
+          {/* MCQ Options */}
+          {q.options?.length > 0 && (
+            <div className="mb-5 space-y-2">
+              {q.options.map((opt) => {
+                const isMyAnswer =
+                  answer?.selectedOption === opt.label ||
+                  (Array.isArray(answer?.selectedOptions) &&
+                    answer.selectedOptions.includes(opt.label));
+                const isRight = opt.isCorrect;
+                const showWrong = isMyAnswer && !isRight;
+
+                return (
+                  <div
+                    key={opt.id}
+                    className={`flex items-start gap-3 rounded-xl border px-4 py-3 ${
+                      isRight
+                        ? "border-emerald-200 bg-emerald-50"
+                        : showWrong
+                          ? "border-red-200 bg-red-50"
+                          : "border-slate-100 bg-slate-50"
+                    }`}
+                  >
+                    {/* Label circle */}
+                    <span
+                      className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-[12px] font-extrabold ${
+                        isRight
+                          ? "bg-emerald-500 text-white"
+                          : showWrong
+                            ? "bg-red-500 text-white"
+                            : "bg-slate-200 text-slate-600"
+                      }`}
+                    >
+                      {opt.label}
+                    </span>
+
+                    {/* Option text */}
+                    <MathText
+                      text={opt.optionText}
+                      katex={katex}
+                      className="flex-1 text-sm leading-relaxed text-slate-700"
+                    />
+
+                    {/* Status icon */}
+                    <div className="flex-shrink-0 mt-0.5">
+                      {isRight && (
+                        <MdCheckCircle size={16} className="text-emerald-500" />
+                      )}
+                      {showWrong && (
+                        <MdCancel size={16} className="text-red-500" />
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Integer answer */}
+          {answer?.integerAnswer !== undefined &&
+            answer?.integerAnswer !== null && (
+              <div className="mb-4 flex items-center gap-3">
+                <span className="text-sm text-slate-500">Your answer:</span>
+                <span
+                  className={`rounded-xl border px-4 py-1.5 text-base font-bold ${
+                    isCorrect
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : "border-red-200 bg-red-50 text-red-700"
+                  }`}
+                >
+                  {answer.integerAnswer}
+                </span>
+              </div>
+            )}
+
+          {/* Solution */}
+          {(q.solutionText ||
+            q.solutionImageUrl ||
+            q.solutionAudioUrl ||
+            q.solutionVideoUrl) && (
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <div className="mb-3 flex items-center gap-2">
+                <MdLightbulb size={16} className="text-amber-600" />
+                <p className="text-[11px] font-bold uppercase tracking-wider text-amber-700">
+                  Solution
+                </p>
+              </div>
+
+              {q.solutionText && (
+                <MathText
+                  text={q.solutionText}
+                  katex={katex}
+                  className="text-sm leading-relaxed text-amber-900"
+                />
+              )}
+              {q.solutionImageUrl && (
+                <img
+                  src={q.solutionImageUrl}
+                  alt="Solution"
+                  className="mt-3 max-w-full rounded-xl"
+                />
+              )}
+              {q.solutionAudioUrl && (
+                <div className="mt-3 flex items-center gap-2">
+                  <MdVolumeUp size={18} className="text-amber-600" />
+                  <audio
+                    controls
+                    src={q.solutionAudioUrl}
+                    className="flex-1 h-9"
+                  />
+                </div>
+              )}
+              {q.solutionVideoUrl && (
+                <div className="mt-3 overflow-hidden rounded-xl">
+                  <iframe
+                    src={q.solutionVideoUrl}
+                    className="h-56 w-full sm:h-72"
+                    allowFullScreen
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Page skeleton ─────────────────────────────────────────────────────────────
+function Skeleton() {
+  return (
+    <div className="space-y-4">
+      {[1, 2, 3].map((i) => (
+        <div
+          key={i}
+          className="animate-pulse overflow-hidden rounded-2xl border border-slate-100 bg-white"
+        >
+          <div className="h-1 bg-slate-200" />
+          <div className="p-5 space-y-3">
+            <div className="h-4 w-1/3 rounded bg-slate-100" />
+            <div className="h-4 w-full rounded bg-slate-100" />
+            <div className="h-4 w-3/4 rounded bg-slate-100" />
+            <div className="space-y-2 mt-4">
+              {[1, 2, 3, 4].map((j) => (
+                <div key={j} className="h-10 rounded-xl bg-slate-100" />
+              ))}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
 export default function SolutionsPage() {
   const { id } = useParams();
   const [data, setData] = useState(null);
@@ -69,6 +381,7 @@ export default function SolutionsPage() {
   useEffect(() => {
     import("katex").then((k) => setKatex(k.default));
   }, []);
+
   useEffect(() => {
     fetch(`/api/result/${id}`)
       .then((r) => r.json())
@@ -85,9 +398,8 @@ export default function SolutionsPage() {
 
   async function toggleBookmark(questionId) {
     const isBookmarked = bookmarks.includes(questionId);
-    const method = isBookmarked ? "DELETE" : "POST";
     const res = await fetch("/api/bookmark", {
-      method,
+      method: isBookmarked ? "DELETE" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ questionId }),
     });
@@ -119,42 +431,23 @@ export default function SolutionsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ questionId, reportType: types[type] }),
     });
-    toast.success("Report submitted!");
+    toast.success("Report submitted. Thank you!");
   }
 
   if (loading)
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <div
-          style={{
-            width: 40,
-            height: 40,
-            border: "3px solid var(--primary-light)",
-            borderTop: "3px solid var(--primary)",
-            borderRadius: "50%",
-          }}
-          className="animate-spin"
-        />
+      <div className="min-h-screen bg-slate-50">
+        <div className="h-36 bg-gradient-to-r from-teal-700 to-cyan-600" />
+        <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
+          <Skeleton />
+        </div>
       </div>
     );
+
   if (!data)
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <p>Not found</p>
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <p className="text-slate-500">Result not found.</p>
       </div>
     );
 
@@ -162,383 +455,138 @@ export default function SolutionsPage() {
   const questions = attempt.test?.testQuestions?.map((tq) => tq.question) || [];
   const answers = attempt.answers || [];
 
+  // Filter
   const filtered = questions.filter((q) => {
     const a = answers.find((an) => an.questionId === q.id);
+    const hasAns =
+      a?.selectedOption || a?.integerAnswer || a?.selectedOptions?.length;
     if (filter === "correct") return a?.isCorrect === true;
-    if (filter === "wrong")
-      return (
-        a?.isCorrect === false &&
-        (a?.selectedOption || a?.integerAnswer || a?.selectedOptions?.length)
-      );
-    if (filter === "skipped")
-      return (
-        !a?.selectedOption && !a?.integerAnswer && !a?.selectedOptions?.length
-      );
+    if (filter === "wrong") return !a?.isCorrect && hasAns;
+    if (filter === "skipped") return !hasAns;
     return true;
   });
 
+  // Stats for filter badges
+  const stats = {
+    all: questions.length,
+    correct: questions.filter(
+      (q) => answers.find((a) => a.questionId === q.id)?.isCorrect === true,
+    ).length,
+    wrong: questions.filter((q) => {
+      const a = answers.find((an) => an.questionId === q.id);
+      return (
+        !a?.isCorrect &&
+        (a?.selectedOption || a?.integerAnswer || a?.selectedOptions?.length)
+      );
+    }).length,
+    skipped: questions.filter((q) => {
+      const a = answers.find((an) => an.questionId === q.id);
+      return (
+        !a?.selectedOption && !a?.integerAnswer && !a?.selectedOptions?.length
+      );
+    }).length,
+  };
+
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "var(--bg-light)",
-        paddingBottom: 60,
-      }}
-    >
-      <div
-        style={{
-          background:
-            "linear-gradient(135deg, var(--primary) 0%, #0891B2 100%)",
-          padding: "32px 20px",
-        }}
-      >
-        <div className="container">
+    <div className="min-h-screen bg-slate-50 pb-16">
+      {/* ── HERO ── */}
+      <div className="bg-gradient-to-br from-teal-700 via-teal-600 to-cyan-600">
+        <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
           <Link
             href={`/result/${id}`}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              color: "rgba(255,255,255,0.8)",
-              textDecoration: "none",
-              fontSize: 14,
-              marginBottom: 16,
-            }}
+            className="mb-6 inline-flex items-center gap-1.5 text-sm font-semibold text-white/65 transition hover:text-white/90 no-underline"
           >
-            <MdArrowBack /> Back to Result
+            <MdArrowBack size={16} /> Back to Result
           </Link>
-          <h1 style={{ fontSize: 22, fontWeight: 900, color: "white" }}>
+
+          <h1 className="text-2xl font-extrabold text-white sm:text-3xl">
             Solutions Review
           </h1>
-          <p
-            style={{
-              fontSize: 14,
-              color: "rgba(255,255,255,0.8)",
-              marginTop: 4,
-            }}
-          >
-            {questions.length} questions
+          <p className="mt-1 text-sm text-white/70">
+            {attempt.test?.title || "Test"} · {questions.length} questions
           </p>
+
+          {/* Quick stats */}
+          <div className="mt-5 flex flex-wrap gap-2">
+            <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-[12px] font-bold text-emerald-200 ring-1 ring-emerald-400/30">
+              ✓ {stats.correct} correct
+            </span>
+            <span className="rounded-full bg-red-500/20 px-3 py-1 text-[12px] font-bold text-red-200 ring-1 ring-red-400/30">
+              ✗ {stats.wrong} wrong
+            </span>
+            <span className="rounded-full bg-white/10 px-3 py-1 text-[12px] font-bold text-white/70 ring-1 ring-white/20">
+              — {stats.skipped} skipped
+            </span>
+          </div>
         </div>
       </div>
 
-      <div className="container" style={{ padding: "20px" }}>
-        {/* Filter */}
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            marginBottom: 20,
-            flexWrap: "wrap",
-          }}
-        >
-          {[
-            ["all", "All"],
-            ["correct", "✓ Correct"],
-            ["wrong", "✗ Wrong"],
-            ["skipped", "— Skipped"],
-          ].map(([val, label]) => (
-            <button
-              key={val}
-              onClick={() => setFilter(val)}
-              style={{
-                padding: "8px 16px",
-                borderRadius: "var(--radius-full)",
-                border: `2px solid ${filter === val ? "var(--primary)" : "var(--border)"}`,
-                background: filter === val ? "var(--primary)" : "white",
-                color: filter === val ? "white" : "var(--text-secondary)",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-                fontFamily: "var(--font)",
-              }}
-            >
-              {label} {val === "all" ? `(${questions.length})` : ""}
-            </button>
-          ))}
+      {/* ── CONTENT ── */}
+      <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
+        {/* Filter pills */}
+        <div className="mb-6 flex flex-wrap gap-2">
+          {FILTERS.map((f) => {
+            const active = filter === f.value;
+            return (
+              <button
+                key={f.value}
+                onClick={() => setFilter(f.value)}
+                className={`flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] font-semibold transition ${
+                  active
+                    ? f.value === "correct"
+                      ? "border-emerald-500 bg-emerald-500 text-white shadow-sm"
+                      : f.value === "wrong"
+                        ? "border-red-500 bg-red-500 text-white shadow-sm"
+                        : f.value === "skipped"
+                          ? "border-slate-500 bg-slate-600 text-white shadow-sm"
+                          : "border-teal-500 bg-teal-600 text-white shadow-sm"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                }`}
+              >
+                {f.label}
+                <span
+                  className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${active ? "bg-white/25 text-white" : "bg-slate-100 text-slate-500"}`}
+                >
+                  {stats[f.value]}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
-        {/* Questions */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {filtered.map((q, idx) => {
+        {/* Empty state */}
+        {filtered.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <p className="text-5xl">🎉</p>
+            <p className="mt-4 text-lg font-bold text-slate-700">
+              {filter === "wrong"
+                ? "No wrong answers!"
+                : filter === "skipped"
+                  ? "No skipped questions!"
+                  : "No questions here"}
+            </p>
+            <p className="mt-1 text-sm text-slate-400">
+              {filter === "wrong" ? "Great job!" : ""}
+            </p>
+          </div>
+        )}
+
+        {/* Question cards */}
+        <div className="space-y-4">
+          {filtered.map((q) => {
             const answer = answers.find((a) => a.questionId === q.id);
-            const isCorrect = answer?.isCorrect;
-            const isSkipped =
-              !answer?.selectedOption &&
-              !answer?.integerAnswer &&
-              !answer?.selectedOptions?.length;
-            const isBookmarked = bookmarks.includes(q.id);
-
+            const globalIdx = questions.indexOf(q) + 1;
             return (
-              <div
+              <QuestionCard
                 key={q.id}
-                style={{
-                  background: "white",
-                  borderRadius: "var(--radius-lg)",
-                  border: `2px solid ${isCorrect ? "#BBF7D0" : isSkipped ? "var(--border)" : "#FECACA"}`,
-                  overflow: "hidden",
-                }}
-              >
-                {/* Status bar */}
-                <div
-                  style={{
-                    padding: "10px 20px",
-                    background: isCorrect
-                      ? "#F0FDF4"
-                      : isSkipped
-                        ? "var(--bg-light)"
-                        : "#FEF2F2",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <div
-                    style={{ display: "flex", alignItems: "center", gap: 8 }}
-                  >
-                    {isCorrect ? (
-                      <MdCheckCircle
-                        style={{ color: "#16A34A", fontSize: 20 }}
-                      />
-                    ) : isSkipped ? (
-                      <MdRadioButtonUnchecked
-                        style={{ color: "#94A3B8", fontSize: 20 }}
-                      />
-                    ) : (
-                      <MdCancel style={{ color: "#DC2626", fontSize: 20 }} />
-                    )}
-                    <span
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 700,
-                        color: isCorrect
-                          ? "#16A34A"
-                          : isSkipped
-                            ? "#94A3B8"
-                            : "#DC2626",
-                      }}
-                    >
-                      {isCorrect ? "Correct" : isSkipped ? "Skipped" : "Wrong"}
-                    </span>
-                    <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
-                      Q{questions.indexOf(q) + 1}
-                    </span>
-                  </div>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button
-                      onClick={() => toggleBookmark(q.id)}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                        fontSize: 20,
-                        color: isBookmarked
-                          ? "var(--primary)"
-                          : "var(--text-muted)",
-                        display: "flex",
-                      }}
-                    >
-                      {isBookmarked ? <MdBookmark /> : <MdBookmarkBorder />}
-                    </button>
-                    <button
-                      onClick={() => reportQuestion(q.id)}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                        fontSize: 18,
-                        color: "var(--text-muted)",
-                        display: "flex",
-                      }}
-                    >
-                      <MdFlag />
-                    </button>
-                  </div>
-                </div>
-
-                <div style={{ padding: "20px" }}>
-                  {/* Question */}
-                  {katex ? (
-                    <div
-                      style={{
-                        fontSize: 15,
-                        lineHeight: 1.8,
-                        marginBottom: 16,
-                      }}
-                      dangerouslySetInnerHTML={{
-                        __html: renderMath(q.questionText, katex),
-                      }}
-                    />
-                  ) : (
-                    <p
-                      style={{
-                        fontSize: 15,
-                        lineHeight: 1.8,
-                        marginBottom: 16,
-                      }}
-                    >
-                      {q.questionText}
-                    </p>
-                  )}
-
-                  {/* Options */}
-                  {q.options?.map((opt) => {
-                    const isMyAnswer = answer?.selectedOption === opt.label;
-                    const isRight = opt.isCorrect;
-                    return (
-                      <div
-                        key={opt.id}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 12,
-                          padding: "10px 14px",
-                          borderRadius: "var(--radius-md)",
-                          border: `1.5px solid ${isRight ? "#BBF7D0" : isMyAnswer && !isRight ? "#FECACA" : "var(--border)"}`,
-                          background: isRight
-                            ? "#F0FDF4"
-                            : isMyAnswer && !isRight
-                              ? "#FEF2F2"
-                              : "var(--bg-light)",
-                          marginBottom: 8,
-                        }}
-                      >
-                        <span
-                          style={{
-                            width: 28,
-                            height: 28,
-                            borderRadius: "50%",
-                            background: isRight
-                              ? "#16A34A"
-                              : isMyAnswer && !isRight
-                                ? "#DC2626"
-                                : "var(--bg-gray)",
-                            color:
-                              isRight || (isMyAnswer && !isRight)
-                                ? "white"
-                                : "var(--text-secondary)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontSize: 12,
-                            fontWeight: 800,
-                            flexShrink: 0,
-                          }}
-                        >
-                          {opt.label}
-                        </span>
-                        {katex ? (
-                          <span
-                            style={{ fontSize: 14, flex: 1 }}
-                            dangerouslySetInnerHTML={{
-                              __html: renderMath(opt.optionText, katex),
-                            }}
-                          />
-                        ) : (
-                          <span style={{ fontSize: 14, flex: 1 }}>
-                            {opt.optionText}
-                          </span>
-                        )}
-                        {isRight && (
-                          <MdCheckCircle
-                            style={{ color: "#16A34A", fontSize: 18 }}
-                          />
-                        )}
-                        {isMyAnswer && !isRight && (
-                          <MdCancel
-                            style={{ color: "#DC2626", fontSize: 18 }}
-                          />
-                        )}
-                      </div>
-                    );
-                  })}
-
-                  {/* Solution */}
-                  {(q.solutionText ||
-                    q.solutionImageUrl ||
-                    q.solutionAudioUrl ||
-                    q.solutionVideoUrl) && (
-                    <div
-                      style={{
-                        marginTop: 16,
-                        padding: "16px",
-                        background: "#FFFBEB",
-                        borderRadius: "var(--radius-md)",
-                        border: "1px solid #FDE68A",
-                      }}
-                    >
-                      <p
-                        style={{
-                          fontSize: 12,
-                          fontWeight: 700,
-                          color: "#92400E",
-                          marginBottom: 10,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.05em",
-                        }}
-                      >
-                        Solution
-                      </p>
-                      {q.solutionText && katex ? (
-                        <div
-                          style={{
-                            fontSize: 14,
-                            lineHeight: 1.7,
-                            color: "var(--text-secondary)",
-                          }}
-                          dangerouslySetInnerHTML={{
-                            __html: renderMath(q.solutionText, katex),
-                          }}
-                        />
-                      ) : (
-                        q.solutionText && (
-                          <p
-                            style={{
-                              fontSize: 14,
-                              lineHeight: 1.7,
-                              color: "var(--text-secondary)",
-                            }}
-                          >
-                            {q.solutionText}
-                          </p>
-                        )
-                      )}
-                      {q.solutionImageUrl && (
-                        <img
-                          src={q.solutionImageUrl}
-                          alt="Solution"
-                          style={{
-                            maxWidth: "100%",
-                            borderRadius: 8,
-                            marginTop: 10,
-                          }}
-                        />
-                      )}
-                      {q.solutionAudioUrl && (
-                        <audio
-                          controls
-                          src={q.solutionAudioUrl}
-                          style={{ width: "100%", marginTop: 10 }}
-                        />
-                      )}
-                      {q.solutionVideoUrl && (
-                        <div style={{ marginTop: 12 }}>
-                          <iframe
-                            src={q.solutionVideoUrl}
-                            style={{
-                              width: "100%",
-                              height: 280,
-                              borderRadius: 8,
-                              border: "none",
-                            }}
-                            allowFullScreen
-                          />
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
+                q={q}
+                qNum={globalIdx}
+                answer={answer}
+                isBookmarked={bookmarks.includes(q.id)}
+                onBookmark={toggleBookmark}
+                onReport={reportQuestion}
+                katex={katex}
+              />
             );
           })}
         </div>

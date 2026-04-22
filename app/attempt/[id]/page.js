@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import {
@@ -10,15 +10,22 @@ import {
   MdArrowBack,
   MdArrowForward,
   MdWarning,
+  MdChevronRight,
+  MdChevronLeft,
+  MdCheck,
+  MdRefresh,
+  MdOutlineBookmarkBorder,
+  MdOutlineBookmark,
 } from "react-icons/md";
 import ReportModal from "@/components/ReportModal";
 import { MAX_TAB_SWITCHES } from "@/lib/constants";
 
+// ── Math renderer ─────────────────────────────────────────────────────────────
 function renderMath(value, katex) {
   if (!value || !katex) return value || "";
   try {
-    let result = value;
-    result = result.replace(/\$\$([^$]+)\$\$/g, (_, m) => {
+    let r = value;
+    r = r.replace(/\$\$([^$]+)\$\$/g, (_, m) => {
       try {
         return katex.renderToString(m.trim(), {
           throwOnError: false,
@@ -30,7 +37,7 @@ function renderMath(value, katex) {
         return m;
       }
     });
-    result = result.replace(/\$([^$\n]+)\$/g, (_, m) => {
+    r = r.replace(/\$([^$\n]+)\$/g, (_, m) => {
       try {
         return katex.renderToString(m.trim(), {
           throwOnError: false,
@@ -42,9 +49,9 @@ function renderMath(value, katex) {
         return m;
       }
     });
-    if (!result.includes("$") && /\\[a-zA-Z]/.test(result)) {
+    if (!r.includes("$") && /\\[a-zA-Z]/.test(r)) {
       try {
-        return katex.renderToString(result.trim(), {
+        return katex.renderToString(r.trim(), {
           throwOnError: false,
           displayMode: false,
           output: "html",
@@ -52,21 +59,25 @@ function renderMath(value, katex) {
         });
       } catch {}
     }
-    result = result.replace(/\n/g, "<br/>");
-    return result;
+    return r.replace(/\n/g, "<br/>");
   } catch {
     return value;
   }
 }
 
-function getPaletteColor(status) {
-  if (status === "answered") return { bg: "#16A34A", text: "white" };
-  if (status === "marked") return { bg: "#7C3AED", text: "white" };
-  if (status === "visited")
-    return { bg: "#FEF2F2", text: "#DC2626", border: "#FECACA" };
-  return { bg: "#F3F4F6", text: "#6B7280", border: "#E5E7EB" };
+// ── Question status → palette colour ─────────────────────────────────────────
+function getPaletteStyle(status, active) {
+  if (active)
+    return "bg-teal-600 text-white ring-2 ring-teal-400 ring-offset-1";
+  if (status === "answered") return "bg-emerald-500 text-white";
+  if (status === "answered-marked") return "bg-violet-600 text-white";
+  if (status === "marked")
+    return "bg-violet-100 text-violet-700 ring-1 ring-violet-300";
+  if (status === "visited") return "bg-red-50 text-red-600 ring-1 ring-red-200";
+  return "bg-slate-100 text-slate-500";
 }
 
+// ── Timer ─────────────────────────────────────────────────────────────────────
 function Timer({ totalSecs, onTimeUp }) {
   const [secs, setSecs] = useState(totalSecs);
   useEffect(() => {
@@ -83,24 +94,14 @@ function Timer({ totalSecs, onTimeUp }) {
   const isLow = secs < 300;
   return (
     <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 6,
-        padding: "6px 14px",
-        background: isLow ? "#FEF2F2" : "#F0FDFA",
-        border: `1px solid ${isLow ? "#FECACA" : "#99F6E4"}`,
-        borderRadius: "var(--radius-full)",
-      }}
+      className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 ${isLow ? "bg-red-50 ring-1 ring-red-200" : "bg-teal-50 ring-1 ring-teal-200"}`}
     >
-      <MdTimer style={{ color: isLow ? "#DC2626" : "#0D9488", fontSize: 18 }} />
+      <MdTimer
+        size={16}
+        className={isLow ? "text-red-500 animate-pulse" : "text-teal-600"}
+      />
       <span
-        style={{
-          fontSize: 15,
-          fontWeight: 800,
-          color: isLow ? "#DC2626" : "#0F766E",
-          fontFamily: "monospace",
-        }}
+        className={`font-mono text-sm font-extrabold tabular-nums ${isLow ? "text-red-600" : "text-teal-700"}`}
       >
         {h > 0 && `${String(h).padStart(2, "0")}:`}
         {String(m).padStart(2, "0")}:{String(s).padStart(2, "0")}
@@ -109,6 +110,261 @@ function Timer({ totalSecs, onTimeUp }) {
   );
 }
 
+// ── Tab switch warning modal ───────────────────────────────────────────────────
+function TabWarning({ count, max, onClose }) {
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+      <div className="w-full max-w-sm rounded-3xl bg-white p-8 text-center shadow-2xl">
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-50">
+          <MdWarning size={32} className="text-red-500" />
+        </div>
+        <h2 className="mb-2 text-xl font-extrabold text-red-600">
+          Tab Switch Detected!
+        </h2>
+        <p className="mb-1 text-sm text-slate-600">
+          You switched tabs or minimised the browser.
+        </p>
+        <p className="mb-6 text-sm font-bold text-red-600">
+          Warning {count}/{max} — Test auto-submits after {max} switches
+        </p>
+        <div className="mb-3 h-2 rounded-full bg-slate-100">
+          <div
+            className="h-2 rounded-full bg-red-500 transition-all"
+            style={{ width: `${(count / max) * 100}%` }}
+          />
+        </div>
+        <button
+          onClick={onClose}
+          className="mt-4 w-full rounded-xl bg-teal-600 py-3 text-sm font-bold text-white transition hover:bg-teal-700"
+        >
+          Return to Test
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Submit confirmation modal ─────────────────────────────────────────────────
+function SubmitModal({
+  answered,
+  total,
+  marked,
+  onCancel,
+  onSubmit,
+  submitting,
+}) {
+  const unanswered = total - answered;
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl">
+        <h2 className="mb-1 text-2xl font-extrabold text-slate-900">
+          Submit Test?
+        </h2>
+        <p className="mb-6 text-sm text-slate-500">
+          Review your progress before submitting.
+        </p>
+
+        <div className="mb-6 grid grid-cols-3 gap-3">
+          <div className="rounded-2xl bg-emerald-50 py-4 text-center">
+            <p className="text-2xl font-extrabold text-emerald-600">
+              {answered}
+            </p>
+            <p className="mt-1 text-[11px] font-semibold text-emerald-700">
+              Answered
+            </p>
+          </div>
+          <div className="rounded-2xl bg-red-50 py-4 text-center">
+            <p className="text-2xl font-extrabold text-red-500">{unanswered}</p>
+            <p className="mt-1 text-[11px] font-semibold text-red-600">
+              Unanswered
+            </p>
+          </div>
+          <div className="rounded-2xl bg-violet-50 py-4 text-center">
+            <p className="text-2xl font-extrabold text-violet-600">{marked}</p>
+            <p className="mt-1 text-[11px] font-semibold text-violet-700">
+              Marked
+            </p>
+          </div>
+        </div>
+
+        {unanswered > 0 && (
+          <div className="mb-5 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <MdWarning size={16} className="flex-shrink-0 text-amber-600" />
+            <p className="text-[13px] text-amber-700">
+              {unanswered} question{unanswered > 1 ? "s" : ""} unanswered.
+              Unanswered = 0 marks.
+            </p>
+          </div>
+        )}
+
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+          >
+            Continue Test
+          </button>
+          <button
+            onClick={onSubmit}
+            disabled={submitting}
+            className="flex-1 rounded-xl bg-teal-600 py-3 text-sm font-bold text-white shadow-lg shadow-teal-600/30 transition hover:bg-teal-700 disabled:opacity-60"
+          >
+            {submitting ? "Submitting..." : "Submit Final"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Question Palette ──────────────────────────────────────────────────────────
+function Palette({
+  questions,
+  current,
+  answers,
+  marked,
+  visited,
+  getStatus,
+  goTo,
+  onClose,
+  show,
+}) {
+  const answeredCount = Object.keys(answers).length;
+  const markedCount = Object.values(marked).filter(Boolean).length;
+
+  return (
+    <>
+      {/* Mobile backdrop */}
+      {show && (
+        <div
+          className="fixed inset-0 z-30 bg-black/40 lg:hidden"
+          onClick={onClose}
+        />
+      )}
+
+      <aside
+        className={`
+        fixed bottom-0 right-0 z-40 flex h-[70vh] w-full flex-col bg-white shadow-2xl
+        transition-transform duration-300 lg:static lg:h-auto lg:w-72 lg:translate-y-0 lg:shadow-none lg:border-l lg:border-slate-200 xl:w-80
+        ${show ? "translate-y-0" : "translate-y-full"}
+        rounded-t-3xl lg:rounded-none
+      `}
+      >
+        {/* Handle (mobile) */}
+        <div className="flex justify-center pt-3 pb-1 lg:hidden">
+          <div className="h-1 w-12 rounded-full bg-slate-200" />
+        </div>
+
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <MdGridView size={16} className="text-slate-500" />
+            <p className="text-sm font-bold text-slate-800">Question Palette</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 lg:hidden"
+          >
+            <MdClose size={18} />
+          </button>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-3 divide-x divide-slate-100 border-b border-slate-100">
+          {[
+            {
+              val: answeredCount,
+              label: "Answered",
+              color: "text-emerald-600",
+            },
+            { val: markedCount, label: "Marked", color: "text-violet-600" },
+            {
+              val: questions.length - answeredCount,
+              label: "Left",
+              color: "text-red-500",
+            },
+          ].map((s) => (
+            <div key={s.label} className="py-3 text-center">
+              <p className={`text-lg font-extrabold ${s.color}`}>{s.val}</p>
+              <p className="text-[10px] font-medium text-slate-400">
+                {s.label}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        {/* Legend */}
+        <div className="grid grid-cols-2 gap-1.5 border-b border-slate-100 px-4 py-3">
+          {[
+            { style: "bg-emerald-500", label: "Answered" },
+            { style: "bg-violet-600", label: "Ans + Marked" },
+            { style: "bg-violet-100 ring-1 ring-violet-300", label: "Marked" },
+            { style: "bg-red-50 ring-1 ring-red-200", label: "Not Answered" },
+            { style: "bg-slate-100", label: "Not Visited" },
+          ].map((l) => (
+            <div key={l.label} className="flex items-center gap-1.5">
+              <div className={`h-3 w-3 flex-shrink-0 rounded-sm ${l.style}`} />
+              <span className="text-[11px] text-slate-500">{l.label}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Grid */}
+        <div className="flex-1 overflow-y-auto p-4">
+          <div className="grid grid-cols-6 gap-1.5 sm:grid-cols-7 lg:grid-cols-5 xl:grid-cols-6">
+            {questions.map((_, i) => {
+              const status = getStatus(i);
+              const active = i === current;
+              return (
+                <button
+                  key={i}
+                  onClick={() => goTo(i)}
+                  className={`flex aspect-square items-center justify-center rounded-lg text-[12px] font-bold transition-all ${getPaletteStyle(status, active)}`}
+                >
+                  {i + 1}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </aside>
+    </>
+  );
+}
+
+// ── Option button ─────────────────────────────────────────────────────────────
+function OptionBtn({ label, text, selected, multi, onClick, katex }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex w-full items-start gap-3 rounded-xl border-2 px-4 py-3.5 text-left transition-all ${
+        selected
+          ? "border-teal-500 bg-teal-50"
+          : "border-slate-200 bg-white hover:border-teal-300 hover:bg-teal-50/40"
+      }`}
+    >
+      <span
+        className={`flex h-8 w-8 flex-shrink-0 items-center justify-center ${multi ? "rounded-lg" : "rounded-full"} text-[13px] font-extrabold transition-colors ${
+          selected ? "bg-teal-600 text-white" : "bg-slate-100 text-slate-600"
+        }`}
+      >
+        {selected && multi ? <MdCheck size={14} /> : label}
+      </span>
+      {katex ? (
+        <span
+          className="flex-1 text-sm leading-relaxed text-slate-800"
+          dangerouslySetInnerHTML={{ __html: renderMath(text, katex) }}
+        />
+      ) : (
+        <span className="flex-1 text-sm leading-relaxed text-slate-800">
+          {text}
+        </span>
+      )}
+    </button>
+  );
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
 export default function AttemptPage() {
   const { id } = useParams();
   const router = useRouter();
@@ -128,13 +384,11 @@ export default function AttemptPage() {
   const [submitting, setSubmitting] = useState(false);
   const [reportId, setReportId] = useState(null);
   const startTime = useRef(Date.now());
-  const saveTimer = useRef(null);
 
   useEffect(() => {
     import("katex").then((k) => setKatex(k.default));
   }, []);
 
-  // Client-side login guard
   useEffect(() => {
     const student = localStorage.getItem("iitneet_student");
     if (!student) {
@@ -164,12 +418,12 @@ export default function AttemptPage() {
           negativeMarking: d.data.negativeMarking,
         });
         if (d.data.resumed && d.data.attempt.answers) {
-          const savedAnswers = {};
+          const saved = {};
           d.data.attempt.answers.forEach((a) => {
-            savedAnswers[a.questionId] =
+            saved[a.questionId] =
               a.selectedOption || a.integerAnswer || a.selectedOptions;
           });
-          setAnswers(savedAnswers);
+          setAnswers(saved);
         }
       })
       .catch(() => {
@@ -181,25 +435,21 @@ export default function AttemptPage() {
 
   // Tab switch detection
   useEffect(() => {
-    function handleVisibility() {
+    function onVisibility() {
       if (document.hidden) {
         setTabSwitches((prev) => {
           const next = prev + 1;
-          if (next >= MAX_TAB_SWITCHES) {
-            handleSubmit(true, next);
-          } else {
-            setShowTabWarn(true);
-          }
+          if (next >= MAX_TAB_SWITCHES) handleSubmit(true, next);
+          else setShowTabWarn(true);
           return next;
         });
       }
     }
-    document.addEventListener("visibilitychange", handleVisibility);
-    return () =>
-      document.removeEventListener("visibilitychange", handleVisibility);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
   }, [attempt]);
 
-  // Block right click + copy paste
+  // Block right-click / copy / paste
   useEffect(() => {
     const block = (e) => e.preventDefault();
     document.addEventListener("contextmenu", block);
@@ -212,12 +462,23 @@ export default function AttemptPage() {
     };
   }, []);
 
-  // Auto save every 30s
+  // Auto-save every 30s
   useEffect(() => {
     if (!attempt) return;
-    saveTimer.current = setInterval(() => saveCurrentAnswer(), 30000);
-    return () => clearInterval(saveTimer.current);
+    const t = setInterval(saveCurrentAnswer, 30000);
+    return () => clearInterval(t);
   }, [attempt, answers, current]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key === "ArrowRight" && current < questions.length - 1)
+        goTo(current + 1);
+      if (e.key === "ArrowLeft" && current > 0) goTo(current - 1);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [current, questions.length]);
 
   async function saveCurrentAnswer() {
     if (!attempt || !questions[current]) return;
@@ -243,13 +504,12 @@ export default function AttemptPage() {
     if (submitting) return;
     setSubmitting(true);
     try {
-      const timeTaken = Math.floor((Date.now() - startTime.current) / 1000);
       const res = await fetch("/api/attempt/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           attemptId: attempt.id,
-          timeTakenSecs: timeTaken,
+          timeTakenSecs: Math.floor((Date.now() - startTime.current) / 1000),
           tabSwitchCount: switches,
           autoSubmitted: auto,
         }),
@@ -266,896 +526,383 @@ export default function AttemptPage() {
     }
   }
 
-  function selectOption(label) {
-    const q = questions[current];
-    setAnswers((a) => ({ ...a, [q.id]: label }));
-  }
-
-  function selectMulti(label) {
-    const q = questions[current];
-    const prev = Array.isArray(answers[q.id]) ? answers[q.id] : [];
-    const next = prev.includes(label)
-      ? prev.filter((l) => l !== label)
-      : [...prev, label];
-    setAnswers((a) => ({ ...a, [q.id]: next }));
-  }
-
   function goTo(i) {
     setCurrent(i);
     setVisited((v) => ({ ...v, [i]: true }));
-    setShowPalette(false);
   }
 
   function getStatus(i) {
     const qid = questions[i]?.id;
     if (!qid) return "not-visited";
-    if (answers[qid] !== undefined && marked[qid]) return "answered-marked";
-    if (answers[qid] !== undefined) return "answered";
+    const hasAns =
+      answers[qid] !== undefined &&
+      answers[qid] !== "" &&
+      (Array.isArray(answers[qid]) ? answers[qid].length > 0 : true);
+    if (hasAns && marked[qid]) return "answered-marked";
+    if (hasAns) return "answered";
     if (marked[qid]) return "marked";
     if (visited[i]) return "visited";
     return "not-visited";
   }
 
-  const answeredCount = Object.keys(answers).length;
-  const markedCount = Object.keys(marked).filter((k) => marked[k]).length;
   const q = questions[current];
+  const answeredCount = Object.keys(answers).filter((k) => {
+    const a = answers[k];
+    return a !== undefined && a !== "" && (!Array.isArray(a) || a.length > 0);
+  }).length;
+  const markedCount = Object.values(marked).filter(Boolean).length;
+  const progress = Math.round(
+    (answeredCount / Math.max(questions.length, 1)) * 100,
+  );
 
+  // ── Loading ──────────────────────────────────────────────────────────────────
   if (loading)
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexDirection: "column",
-          gap: 16,
-        }}
-      >
-        <div
-          style={{
-            width: 48,
-            height: 48,
-            border: "4px solid var(--primary-light)",
-            borderTop: "4px solid var(--primary)",
-            borderRadius: "50%",
-          }}
-          className="animate-spin"
-        />
-        <p style={{ color: "var(--text-muted)", fontSize: 15 }}>
-          Loading test...
-        </p>
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-50">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-teal-100 border-t-teal-600" />
+        <p className="text-sm font-medium text-slate-500">Loading test...</p>
       </div>
     );
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#F8FAFC",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
+    <div className="flex h-screen flex-col overflow-hidden bg-slate-50 select-none">
+      {/* Modals */}
       {reportId && (
         <ReportModal questionId={reportId} onClose={() => setReportId(null)} />
       )}
-
-      {/* Tab switch warning */}
       {showTabWarn && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.7)",
-            zIndex: 200,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 20,
-          }}
-        >
-          <div
-            style={{
-              background: "white",
-              borderRadius: "var(--radius-xl)",
-              padding: "32px",
-              maxWidth: 420,
-              width: "100%",
-              textAlign: "center",
-            }}
-          >
-            <div
-              style={{
-                width: 64,
-                height: 64,
-                background: "#FEF2F2",
-                borderRadius: "50%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                margin: "0 auto 16px",
-                fontSize: 32,
-              }}
-            >
-              <MdWarning style={{ color: "#DC2626" }} />
-            </div>
-            <h2
-              style={{
-                fontSize: 20,
-                fontWeight: 800,
-                color: "#DC2626",
-                marginBottom: 8,
-              }}
-            >
-              Tab Switch Detected!
-            </h2>
-            <p
-              style={{
-                fontSize: 15,
-                color: "var(--text-secondary)",
-                marginBottom: 8,
-              }}
-            >
-              You switched tabs or minimized the browser.
-            </p>
-            <p
-              style={{
-                fontSize: 14,
-                fontWeight: 700,
-                color: "#DC2626",
-                marginBottom: 20,
-              }}
-            >
-              Warning {tabSwitches}/{MAX_TAB_SWITCHES} — Test will auto-submit
-              after {MAX_TAB_SWITCHES} switches
-            </p>
-            <button
-              onClick={() => setShowTabWarn(false)}
-              className="btn-primary"
-              style={{ width: "100%", justifyContent: "center" }}
-            >
-              Return to Test
-            </button>
-          </div>
-        </div>
+        <TabWarning
+          count={tabSwitches}
+          max={MAX_TAB_SWITCHES}
+          onClose={() => setShowTabWarn(false)}
+        />
       )}
-
-      {/* Submit confirmation */}
       {showSubmit && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.6)",
-            zIndex: 100,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 20,
-          }}
-        >
-          <div
-            style={{
-              background: "white",
-              borderRadius: "var(--radius-xl)",
-              padding: "32px",
-              maxWidth: 400,
-              width: "100%",
-            }}
-          >
-            <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 16 }}>
-              Submit Test?
-            </h2>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 12,
-                marginBottom: 20,
-              }}
-            >
-              <div
-                style={{
-                  background: "#F0FDF4",
-                  borderRadius: "var(--radius-md)",
-                  padding: "16px",
-                  textAlign: "center",
-                }}
-              >
-                <p style={{ fontSize: 24, fontWeight: 800, color: "#16A34A" }}>
-                  {answeredCount}
-                </p>
-                <p style={{ fontSize: 12, color: "#16A34A" }}>Answered</p>
-              </div>
-              <div
-                style={{
-                  background: "#FEF2F2",
-                  borderRadius: "var(--radius-md)",
-                  padding: "16px",
-                  textAlign: "center",
-                }}
-              >
-                <p style={{ fontSize: 24, fontWeight: 800, color: "#DC2626" }}>
-                  {questions.length - answeredCount}
-                </p>
-                <p style={{ fontSize: 12, color: "#DC2626" }}>Unanswered</p>
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: 12 }}>
-              <button
-                onClick={() => setShowSubmit(false)}
-                className="btn-secondary"
-                style={{ flex: 1, justifyContent: "center" }}
-              >
-                Continue
-              </button>
-              <button
-                onClick={() => handleSubmit()}
-                disabled={submitting}
-                className="btn-primary"
-                style={{ flex: 1, justifyContent: "center" }}
-              >
-                {submitting ? "Submitting..." : "Submit"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <SubmitModal
+          answered={answeredCount}
+          total={questions.length}
+          marked={markedCount}
+          onCancel={() => setShowSubmit(false)}
+          onSubmit={() => handleSubmit()}
+          submitting={submitting}
+        />
       )}
 
-      {/* Top bar */}
-      <div
-        style={{
-          background: "white",
-          borderBottom: "1px solid var(--border)",
-          padding: "0 16px",
-          height: 60,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          position: "sticky",
-          top: 0,
-          zIndex: 40,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div
-            style={{
-              width: 32,
-              height: 32,
-              background:
-                "linear-gradient(135deg, var(--primary) 0%, #0891B2 100%)",
-              borderRadius: 8,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 13,
-              fontWeight: 800,
-              color: "white",
-            }}
-          >
+      {/* ── TOP BAR ── */}
+      <header className="flex h-14 flex-shrink-0 items-center justify-between border-b border-slate-200 bg-white px-3 sm:px-5">
+        {/* Left: logo + test name */}
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-teal-600 to-cyan-600 text-[11px] font-extrabold text-white">
             IN
           </div>
-          <div>
-            <p
-              style={{
-                fontSize: 13,
-                fontWeight: 700,
-                color: "var(--text-primary)",
-              }}
-            >
-              {questions[0]?.chapter?.name || "Test"}
+          <div className="hidden min-w-0 sm:block">
+            <p className="truncate text-sm font-bold text-slate-800 max-w-[200px] lg:max-w-sm">
+              {testInfo.testTitle || questions[0]?.chapter?.name || "Test"}
             </p>
-            <p style={{ fontSize: 11, color: "var(--text-muted)" }}>
-              Q {current + 1}/{questions.length} · {testInfo.marksCorrect} marks
+            <p className="text-[11px] text-slate-400">
+              Q {current + 1}/{questions.length} · +{testInfo.marksCorrect}/
+              {testInfo.negativeMarking}
             </p>
           </div>
+          {/* Mobile: just Q counter */}
+          <span className="text-sm font-bold text-slate-700 sm:hidden">
+            Q {current + 1}/{questions.length}
+          </span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+
+        {/* Center: progress bar (hidden on mobile) */}
+        <div className="hidden flex-1 items-center gap-3 px-6 md:flex">
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+            <div
+              className="h-1.5 rounded-full bg-emerald-500 transition-all duration-300"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <span className="whitespace-nowrap text-[12px] font-semibold text-slate-500">
+            {answeredCount}/{questions.length}
+          </span>
+        </div>
+
+        {/* Right: tab warn + timer + palette toggle + submit */}
+        <div className="flex items-center gap-2">
           {tabSwitches > 0 && (
-            <span
-              style={{
-                fontSize: 12,
-                fontWeight: 700,
-                color: "#DC2626",
-                background: "#FEF2F2",
-                padding: "4px 10px",
-                borderRadius: "var(--radius-full)",
-              }}
-            >
-              ⚠️ {tabSwitches}/{MAX_TAB_SWITCHES} switches
+            <span className="hidden items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-600 ring-1 ring-red-200 sm:flex">
+              ⚠️ {tabSwitches}/{MAX_TAB_SWITCHES}
             </span>
           )}
+
           {attempt && (
             <Timer
               totalSecs={testInfo.durationMins * 60}
               onTimeUp={() => handleSubmit(true)}
             />
           )}
+
+          {/* Palette toggle (mobile) */}
           <button
             onClick={() => setShowPalette((p) => !p)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "6px 12px",
-              background: "var(--primary-light)",
-              border: "1px solid var(--primary-border)",
-              borderRadius: "var(--radius-full)",
-              fontSize: 12,
-              fontWeight: 600,
-              color: "var(--primary-dark)",
-              cursor: "pointer",
-              fontFamily: "var(--font)",
-            }}
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 lg:hidden"
           >
-            <MdGridView /> Palette
+            <MdGridView size={18} />
           </button>
+
           <button
             onClick={() => setShowSubmit(true)}
-            className="btn-primary"
-            style={{ padding: "8px 16px", fontSize: 13 }}
+            className="rounded-xl bg-teal-600 px-3 py-2 text-[13px] font-bold text-white shadow-sm transition hover:bg-teal-700 sm:px-4"
           >
             Submit
           </button>
         </div>
-      </div>
+      </header>
 
-      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-        {/* Question area */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "24px 16px" }}>
-          <div style={{ maxWidth: 760, margin: "0 auto" }}>
-            {/* Question header */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                marginBottom: 16,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span
-                  style={{
-                    padding: "6px 16px",
-                    background: "var(--primary)",
-                    color: "white",
-                    borderRadius: "var(--radius-full)",
-                    fontSize: 13,
-                    fontWeight: 700,
-                  }}
-                >
-                  Q {current + 1} / {questions.length}
+      {/* ── BODY ── */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* ── QUESTION AREA ── */}
+        <main className="flex flex-1 flex-col overflow-hidden">
+          {/* Question header strip */}
+          <div className="flex flex-shrink-0 items-center justify-between border-b border-slate-100 bg-white px-4 py-2 sm:px-6">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="rounded-full bg-teal-600 px-3 py-1 text-[12px] font-bold text-white">
+                Q {current + 1}
+              </span>
+              {q?.chapter?.name && (
+                <span className="text-[12px] text-slate-400">
+                  {q.chapter.name}
                 </span>
-                {q?.chapter?.name && (
-                  <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
-                    {q.chapter.name}
-                  </span>
+              )}
+              {q?.difficulty && (
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                    q.difficulty === "EASY"
+                      ? "bg-emerald-50 text-emerald-700"
+                      : q.difficulty === "HARD"
+                        ? "bg-red-50 text-red-700"
+                        : "bg-amber-50 text-amber-700"
+                  }`}
+                >
+                  {q.difficulty}
+                </span>
+              )}
+            </div>
+            <span className="text-[12px] font-semibold text-slate-400">
+              +{testInfo.marksCorrect} / {testInfo.negativeMarking}
+            </span>
+          </div>
+
+          {/* Scrollable question content */}
+          <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6">
+            <div className="mx-auto max-w-3xl space-y-4">
+              {/* Question card */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                {q?.questionImageUrl && (
+                  <img
+                    src={q.questionImageUrl}
+                    alt=""
+                    className="mb-4 max-h-52 rounded-xl object-contain"
+                  />
                 )}
-                {q?.difficulty && (
-                  <span
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 600,
-                      padding: "3px 8px",
-                      borderRadius: "var(--radius-full)",
-                      background:
-                        q.difficulty === "EASY"
-                          ? "#F0FDF4"
-                          : q.difficulty === "HARD"
-                            ? "#FEF2F2"
-                            : "#FFFBEB",
-                      color:
-                        q.difficulty === "EASY"
-                          ? "#16A34A"
-                          : q.difficulty === "HARD"
-                            ? "#DC2626"
-                            : "#D97706",
+                {katex ? (
+                  <div
+                    className="text-[15px] leading-[1.9] text-slate-800"
+                    dangerouslySetInnerHTML={{
+                      __html: renderMath(q?.questionText, katex),
                     }}
-                  >
-                    {q.difficulty}
-                  </span>
+                  />
+                ) : (
+                  <p className="text-[15px] leading-[1.9] text-slate-800">
+                    {q?.questionText}
+                  </p>
                 )}
               </div>
-              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-                +{testInfo.marksCorrect} / {testInfo.negativeMarking}
-              </div>
-            </div>
 
-            {/* Question text */}
-            <div
-              style={{
-                background: "white",
-                borderRadius: "var(--radius-lg)",
-                border: "1px solid var(--border)",
-                padding: "24px",
-                marginBottom: 16,
-              }}
-            >
-              {q?.questionImageUrl && (
-                <img
-                  src={q.questionImageUrl}
-                  alt=""
-                  style={{
-                    maxHeight: 200,
-                    objectFit: "contain",
-                    marginBottom: 16,
-                    borderRadius: 8,
-                  }}
-                />
-              )}
-              {q && katex ? (
-                <div
-                  style={{
-                    fontSize: 16,
-                    lineHeight: 1.8,
-                    color: "var(--text-primary)",
-                  }}
-                  dangerouslySetInnerHTML={{
-                    __html: renderMath(q.questionText, katex),
-                  }}
-                />
-              ) : (
-                <p style={{ fontSize: 16, lineHeight: 1.8 }}>
-                  {q?.questionText}
-                </p>
-              )}
-            </div>
-
-            {/* MCQ options */}
-            {q?.questionType === "MCQ" && (
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 10,
-                  marginBottom: 20,
-                }}
-              >
-                {q.options?.map((opt) => {
-                  const selected = answers[q.id] === opt.label;
-                  return (
-                    <button
+              {/* MCQ */}
+              {q?.questionType === "MCQ" && (
+                <div className="space-y-2.5">
+                  {q.options?.map((opt) => (
+                    <OptionBtn
                       key={opt.id}
-                      onClick={() => selectOption(opt.label)}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 14,
-                        padding: "14px 18px",
-                        background: selected ? "var(--primary-light)" : "white",
-                        border: `2px solid ${selected ? "var(--primary)" : "var(--border)"}`,
-                        borderRadius: "var(--radius-lg)",
-                        cursor: "pointer",
-                        textAlign: "left",
-                        transition: "all 0.15s",
-                        fontFamily: "var(--font)",
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: "50%",
-                          background: selected
-                            ? "var(--primary)"
-                            : "var(--bg-light)",
-                          color: selected ? "white" : "var(--text-secondary)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontSize: 13,
-                          fontWeight: 800,
-                          flexShrink: 0,
+                      label={opt.label}
+                      text={opt.optionText}
+                      selected={answers[q.id] === opt.label}
+                      multi={false}
+                      onClick={() =>
+                        setAnswers((a) => ({ ...a, [q.id]: opt.label }))
+                      }
+                      katex={katex}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Multi-correct */}
+              {q?.questionType === "MULTI_CORRECT" && (
+                <div className="space-y-2.5">
+                  <p className="text-[12px] font-semibold text-slate-400">
+                    Select all correct options
+                  </p>
+                  {q.options?.map((opt) => {
+                    const sel = (
+                      Array.isArray(answers[q.id]) ? answers[q.id] : []
+                    ).includes(opt.label);
+                    return (
+                      <OptionBtn
+                        key={opt.id}
+                        label={opt.label}
+                        text={opt.optionText}
+                        selected={sel}
+                        multi={true}
+                        onClick={() => {
+                          const prev = Array.isArray(answers[q.id])
+                            ? answers[q.id]
+                            : [];
+                          const next = prev.includes(opt.label)
+                            ? prev.filter((l) => l !== opt.label)
+                            : [...prev, opt.label];
+                          setAnswers((a) => ({ ...a, [q.id]: next }));
                         }}
-                      >
-                        {opt.label}
-                      </span>
-                      {katex ? (
-                        <span
-                          style={{
-                            fontSize: 15,
-                            color: "var(--text-primary)",
-                            flex: 1,
-                          }}
-                          dangerouslySetInnerHTML={{
-                            __html: renderMath(opt.optionText, katex),
-                          }}
-                        />
-                      ) : (
-                        <span style={{ fontSize: 15, flex: 1 }}>
-                          {opt.optionText}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+                        katex={katex}
+                      />
+                    );
+                  })}
+                </div>
+              )}
 
-            {/* Multi correct */}
-            {q?.questionType === "MULTI_CORRECT" && (
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 10,
-                  marginBottom: 20,
-                }}
-              >
-                <p
-                  style={{
-                    fontSize: 12,
-                    color: "var(--text-muted)",
-                    marginBottom: 4,
-                  }}
-                >
-                  Select all correct options
-                </p>
-                {q.options?.map((opt) => {
-                  const sel = (
-                    Array.isArray(answers[q.id]) ? answers[q.id] : []
-                  ).includes(opt.label);
-                  return (
-                    <button
-                      key={opt.id}
-                      onClick={() => selectMulti(opt.label)}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 14,
-                        padding: "14px 18px",
-                        background: sel ? "var(--primary-light)" : "white",
-                        border: `2px solid ${sel ? "var(--primary)" : "var(--border)"}`,
-                        borderRadius: "var(--radius-lg)",
-                        cursor: "pointer",
-                        textAlign: "left",
-                        fontFamily: "var(--font)",
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: 8,
-                          background: sel
-                            ? "var(--primary)"
-                            : "var(--bg-light)",
-                          color: sel ? "white" : "var(--text-secondary)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontSize: 13,
-                          fontWeight: 800,
-                          flexShrink: 0,
-                        }}
-                      >
-                        {opt.label}
-                      </span>
-                      {katex ? (
-                        <span
-                          style={{ fontSize: 15, flex: 1 }}
-                          dangerouslySetInnerHTML={{
-                            __html: renderMath(opt.optionText, katex),
-                          }}
-                        />
-                      ) : (
-                        <span style={{ fontSize: 15, flex: 1 }}>
-                          {opt.optionText}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+              {/* Integer */}
+              {q?.questionType === "INTEGER" && (
+                <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                  <p className="mb-3 text-[13px] font-semibold text-slate-500">
+                    Enter your answer:
+                  </p>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={answers[q.id] || ""}
+                    onChange={(e) =>
+                      setAnswers((a) => ({ ...a, [q.id]: e.target.value }))
+                    }
+                    onWheel={(e) => e.target.blur()}
+                    className="w-36 rounded-xl border-2 border-slate-200 bg-slate-50 py-3 text-center text-2xl font-extrabold text-slate-800 outline-none focus:border-teal-400 focus:bg-white focus:ring-2 focus:ring-teal-100"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
 
-            {/* Integer */}
-            {q?.questionType === "INTEGER" && (
-              <div style={{ marginBottom: 20 }}>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: "var(--text-secondary)",
-                    marginBottom: 10,
-                  }}
-                >
-                  Enter integer answer:
-                </label>
-                <input
-                  type="number"
-                  className="input-field"
-                  style={{
-                    width: 160,
-                    fontSize: 20,
-                    fontWeight: 800,
-                    textAlign: "center",
-                  }}
-                  placeholder="0"
-                  value={answers[q.id] || ""}
-                  onChange={(e) =>
-                    setAnswers((a) => ({ ...a, [q.id]: e.target.value }))
-                  }
-                />
-              </div>
-            )}
-
-            {/* Navigation */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
-            >
-              <div style={{ display: "flex", gap: 10 }}>
+          {/* ── BOTTOM NAV BAR ── */}
+          <div className="flex-shrink-0 border-t border-slate-200 bg-white px-4 py-3 sm:px-6">
+            <div className="mx-auto flex max-w-3xl items-center justify-between gap-2">
+              {/* Left actions */}
+              <div className="flex items-center gap-2">
                 <button
                   onClick={() => q && setReportId(q.id)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    padding: "10px 14px",
-                    borderRadius: "var(--r-full)",
-                    border: "1px solid var(--border)",
-                    background: "white",
-                    fontSize: 13,
-                    color: "var(--gray-500)",
-                    cursor: "pointer",
-                    fontFamily: "var(--font-body)",
-                  }}
+                  className="flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-[12px] font-semibold text-slate-500 transition hover:bg-slate-50"
                 >
-                  <MdFlag style={{ fontSize: 16 }} /> Report
+                  <MdFlag size={14} />{" "}
+                  <span className="hidden sm:inline">Report</span>
                 </button>
+
                 <button
                   onClick={() =>
                     setMarked((m) => ({ ...m, [q?.id]: !m[q?.id] }))
                   }
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    padding: "10px 16px",
-                    borderRadius: "var(--radius-full)",
-                    border: `2px solid ${marked[q?.id] ? "#7C3AED" : "var(--border)"}`,
-                    background: marked[q?.id] ? "#F5F3FF" : "white",
-                    color: marked[q?.id] ? "#7C3AED" : "var(--text-secondary)",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    fontFamily: "var(--font)",
-                  }}
+                  className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[12px] font-semibold transition ${
+                    marked[q?.id]
+                      ? "border-violet-300 bg-violet-50 text-violet-700"
+                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  }`}
                 >
-                  <MdFlag /> {marked[q?.id] ? "Marked" : "Mark for Review"}
+                  {marked[q?.id] ? (
+                    <MdOutlineBookmark size={15} />
+                  ) : (
+                    <MdOutlineBookmarkBorder size={15} />
+                  )}
+                  <span className="hidden sm:inline">
+                    {marked[q?.id] ? "Marked" : "Mark"}
+                  </span>
                 </button>
-                {answers[q?.id] !== undefined && (
-                  <button
-                    onClick={() =>
-                      setAnswers((a) => {
-                        const c = { ...a };
-                        delete c[q.id];
-                        return c;
-                      })
-                    }
-                    style={{
-                      padding: "10px 14px",
-                      borderRadius: "var(--radius-full)",
-                      border: "1px solid var(--border)",
-                      background: "white",
-                      fontSize: 13,
-                      color: "var(--text-muted)",
-                      cursor: "pointer",
-                      fontFamily: "var(--font)",
-                    }}
-                  >
-                    Clear
-                  </button>
-                )}
+
+                {answers[q?.id] !== undefined &&
+                  answers[q?.id] !== "" &&
+                  !(
+                    Array.isArray(answers[q?.id]) && answers[q?.id].length === 0
+                  ) && (
+                    <button
+                      onClick={() =>
+                        setAnswers((a) => {
+                          const c = { ...a };
+                          delete c[q.id];
+                          return c;
+                        })
+                      }
+                      className="flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-[12px] font-semibold text-slate-500 transition hover:bg-red-50 hover:text-red-600"
+                    >
+                      <MdRefresh size={14} />{" "}
+                      <span className="hidden sm:inline">Clear</span>
+                    </button>
+                  )}
               </div>
-              <div style={{ display: "flex", gap: 10 }}>
+
+              {/* Right: Prev / Next */}
+              <div className="flex items-center gap-2">
                 <button
                   onClick={() => current > 0 && goTo(current - 1)}
                   disabled={current === 0}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    padding: "10px 18px",
-                    borderRadius: "var(--radius-full)",
-                    border: "1.5px solid var(--border)",
-                    background: "white",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: current === 0 ? "not-allowed" : "pointer",
-                    opacity: current === 0 ? 0.4 : 1,
-                    fontFamily: "var(--font)",
-                    color: "var(--text-secondary)",
-                  }}
+                  className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-40"
                 >
-                  <MdArrowBack /> Prev
+                  <MdArrowBack size={16} />{" "}
+                  <span className="hidden sm:inline">Prev</span>
                 </button>
-                <button
-                  onClick={() =>
-                    current < questions.length - 1 && goTo(current + 1)
-                  }
-                  disabled={current === questions.length - 1}
-                  className="btn-primary"
-                  style={{
-                    padding: "10px 18px",
-                    fontSize: 13,
-                    opacity: current === questions.length - 1 ? 0.4 : 1,
-                  }}
-                >
-                  Next <MdArrowForward />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
 
-        {/* Palette sidebar */}
-        {showPalette && (
-          <div
-            style={{
-              width: 280,
-              background: "white",
-              borderLeft: "1px solid var(--border)",
-              overflowY: "auto",
-              flexShrink: 0,
-            }}
-          >
-            <div
-              style={{
-                padding: "16px",
-                borderBottom: "1px solid var(--border)",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                position: "sticky",
-                top: 0,
-                background: "white",
-              }}
-            >
-              <p style={{ fontSize: 14, fontWeight: 700 }}>Question Palette</p>
-              <button
-                onClick={() => setShowPalette(false)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: 20,
-                  color: "var(--text-muted)",
-                  display: "flex",
-                }}
-              >
-                <MdClose />
-              </button>
-            </div>
-
-            {/* Legend */}
-            <div
-              style={{
-                padding: "12px 16px",
-                borderBottom: "1px solid var(--border)",
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 8,
-              }}
-            >
-              {[
-                ["answered", "Answered"],
-                ["marked", "Marked"],
-                ["visited", "Not Answered"],
-                ["not-visited", "Not Visited"],
-              ].map(([s, l]) => {
-                const c = getPaletteColor(s);
-                return (
-                  <div
-                    key={s}
-                    style={{ display: "flex", alignItems: "center", gap: 6 }}
-                  >
-                    <div
-                      style={{
-                        width: 16,
-                        height: 16,
-                        borderRadius: 4,
-                        background: c.bg,
-                        border: `1px solid ${c.border || c.bg}`,
-                        flexShrink: 0,
-                      }}
-                    />
-                    <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                      {l}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Summary */}
-            <div
-              style={{
-                padding: "12px 16px",
-                borderBottom: "1px solid var(--border)",
-                display: "grid",
-                gridTemplateColumns: "repeat(3, 1fr)",
-                textAlign: "center",
-                gap: 8,
-              }}
-            >
-              <div>
-                <p style={{ fontSize: 18, fontWeight: 800, color: "#16A34A" }}>
-                  {answeredCount}
-                </p>
-                <p style={{ fontSize: 10, color: "var(--text-muted)" }}>
-                  Answered
-                </p>
-              </div>
-              <div>
-                <p style={{ fontSize: 18, fontWeight: 800, color: "#7C3AED" }}>
-                  {markedCount}
-                </p>
-                <p style={{ fontSize: 10, color: "var(--text-muted)" }}>
-                  Marked
-                </p>
-              </div>
-              <div>
-                <p
-                  style={{
-                    fontSize: 18,
-                    fontWeight: 800,
-                    color: "var(--text-muted)",
-                  }}
-                >
-                  {questions.length - answeredCount}
-                </p>
-                <p style={{ fontSize: 10, color: "var(--text-muted)" }}>Left</p>
-              </div>
-            </div>
-
-            {/* Grid */}
-            <div
-              style={{
-                padding: "16px",
-                display: "grid",
-                gridTemplateColumns: "repeat(5, 1fr)",
-                gap: 8,
-              }}
-            >
-              {questions.map((_, i) => {
-                const status = getStatus(i);
-                const c = getPaletteColor(status);
-                const active = i === current;
-                return (
+                {current === questions.length - 1 ? (
                   <button
-                    key={i}
-                    onClick={() => goTo(i)}
-                    style={{
-                      width: "100%",
-                      aspectRatio: "1",
-                      borderRadius: 8,
-                      fontSize: 12,
-                      fontWeight: 700,
-                      cursor: "pointer",
-                      fontFamily: "var(--font)",
-                      background: active ? "var(--primary)" : c.bg,
-                      color: active ? "white" : c.text,
-                      border: active ? "none" : `1px solid ${c.border || c.bg}`,
-                      outline: active ? "2px solid var(--primary)" : "none",
-                      outlineOffset: active ? "2px" : "0",
-                      transition: "all 0.15s",
-                    }}
+                    onClick={() => setShowSubmit(true)}
+                    className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700"
                   >
-                    {i + 1}
+                    <MdCheck size={16} /> Submit
                   </button>
-                );
-              })}
+                ) : (
+                  <button
+                    onClick={() => goTo(current + 1)}
+                    className="flex items-center gap-1.5 rounded-xl bg-teal-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-teal-700"
+                  >
+                    <span className="hidden sm:inline">Next</span>{" "}
+                    <MdArrowForward size={16} />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-        )}
+        </main>
+
+        {/* ── PALETTE: desktop always visible, mobile sheet ── */}
+        <Palette
+          questions={questions}
+          current={current}
+          answers={answers}
+          marked={marked}
+          visited={visited}
+          getStatus={getStatus}
+          goTo={(i) => {
+            goTo(i);
+            setShowPalette(false);
+          }}
+          onClose={() => setShowPalette(false)}
+          show={showPalette}
+        />
+
+        {/* Desktop palette toggle button (collapsed state) — shown as a tab on the right edge when palette is hidden on desktop */}
+        {/* Desktop: palette is always rendered via CSS, the button below is just for mobile */}
       </div>
+
+      {/* Palette toggle FAB — only on mobile when palette is closed */}
+      {!showPalette && (
+        <button
+          onClick={() => setShowPalette(true)}
+          className="fixed bottom-20 right-4 z-30 flex h-12 w-12 items-center justify-center rounded-full bg-teal-600 shadow-lg text-white transition hover:bg-teal-700 lg:hidden"
+        >
+          <MdGridView size={22} />
+        </button>
+      )}
     </div>
   );
 }
