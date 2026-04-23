@@ -72,184 +72,131 @@ function getDaysUntil(dateStr) {
 }
 
 // ── Scholarship Popup ────────────────────────────────────────────────────────
-function ScholarshipPopup({ test, state, onClose }) {
-  useEffect(() => {
-    const t = setTimeout(onClose, 30000);
-    return () => clearTimeout(t);
-  }, [onClose]);
+// ── Scholarship Popup (compact, bottom-right) ───────────────────────────────
+// Drop this in place of the old ScholarshipPopup in your HomeClient file.
+// Positioning: bottom-right on desktop, bottom on mobile (with gap for WhatsApp FAB).
 
+function ScholarshipPopup({ test, state, onClose }) {
   const daysLeft = test.endedAt ? getDaysLeft(test.endedAt) : null;
   const daysUntil = test.scheduledAt ? getDaysUntil(test.scheduledAt) : null;
 
+  const cta =
+    state === "upcoming"
+      ? "Get Notified"
+      : state === "live"
+        ? "Attempt Now"
+        : "Attempt Free";
+
+  const badgeText =
+    state === "live"
+      ? "LIVE NOW"
+      : state === "upcoming"
+        ? `OPENS IN ${daysUntil}D`
+        : "FREE TEST";
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.72)", backdropFilter: "blur(6px)" }}
-      onClick={onClose}
+      className="
+        fixed z-40
+        left-4 right-4 bottom-4
+        sm:left-auto sm:right-6 sm:bottom-24
+        sm:w-[340px]
+        animate-[slideUp_0.4s_ease-out]
+      "
     >
       <div
-        className="relative w-full max-w-lg overflow-hidden rounded-3xl shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
-          border: "1px solid rgba(255,255,255,0.1)",
-        }}
+        className="
+        relative overflow-hidden rounded-2xl
+        bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900
+        ring-1 ring-amber-400/20
+        shadow-2xl shadow-amber-500/10
+      "
       >
-        {/* Glow blobs */}
-        <div
-          className="pointer-events-none absolute -left-16 -top-16 h-48 w-48 rounded-full blur-3xl"
-          style={{ background: "rgba(251,191,36,0.2)" }}
-        />
-        <div
-          className="pointer-events-none absolute -right-16 -bottom-16 h-48 w-48 rounded-full blur-3xl"
-          style={{ background: "rgba(239,68,68,0.15)" }}
-        />
+        {/* Decorative glow */}
+        <div className="pointer-events-none absolute -top-10 -right-10 h-32 w-32 rounded-full bg-amber-400/20 blur-3xl" />
 
         {/* Close */}
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition hover:bg-white/10 hover:text-white"
+          aria-label="Close"
+          className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full text-slate-400 transition hover:bg-white/10 hover:text-white"
         >
-          <MdClose size={20} />
+          <MdClose size={16} />
         </button>
 
-        <div className="relative p-8 sm:p-10">
-          {/* Live / Upcoming pill */}
-          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-500/10 px-3 py-1">
-            {state === "live" ? (
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-400" />
+        <div className="relative p-4">
+          {/* Header row: icon + badge */}
+          <div className="mb-2 flex items-center gap-2">
+            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-lg shadow-lg">
+              🏆
+            </div>
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2 py-0.5 ring-1 ring-amber-400/30">
+              {state === "live" ? (
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber-400" />
+                </span>
+              ) : (
+                <MdTimer size={10} className="text-amber-400" />
+              )}
+              <span className="text-[10px] font-black tracking-wider text-amber-300">
+                {badgeText}
               </span>
-            ) : (
-              <MdTimer size={12} className="text-amber-400" />
-            )}
-            <span className="text-[11px] font-bold uppercase tracking-widest text-amber-300">
-              {state === "live"
-                ? "Live Now · Register Free"
-                : state === "upcoming"
-                  ? `Opens in ${daysUntil} days`
-                  : "Register Free"}
-            </span>
+            </div>
           </div>
 
-          <div className="mb-4 text-5xl">🏆</div>
-
-          <h2 className="text-2xl font-extrabold leading-tight text-white sm:text-3xl">
+          {/* Title */}
+          <h3 className="text-[15px] font-bold leading-snug text-white">
             {test.title}
-          </h2>
+          </h3>
 
-          {test.description && (
-            <p className="mt-2 text-sm leading-relaxed text-slate-300">
-              {test.description}
+          {/* Meta row — compact stats inline */}
+          <p className="mt-1.5 text-[11px] text-slate-400">
+            {test.durationMins}m{" · "}
+            {test.totalMarks} marks
+            {Number(test.price) === 0 && (
+              <>
+                {" "}
+                · <span className="font-semibold text-emerald-400">Free</span>
+              </>
+            )}
+          </p>
+
+          {/* Urgency (only if live + days left) */}
+          {state === "live" && daysLeft !== null && daysLeft <= 7 && (
+            <p className="mt-2 text-[11px] text-rose-300">
+              <MdTimer size={10} className="inline -mt-0.5 mr-1" />
+              Closes in{" "}
+              <strong className="text-white">
+                {daysLeft} day{daysLeft === 1 ? "" : "s"}
+              </strong>
             </p>
-          )}
-
-          {/* Stats */}
-          <div className="mt-5 grid grid-cols-3 gap-2">
-            {[
-              {
-                label: "Questions",
-                value:
-                  test.testQuestions?.length ||
-                  test._count?.testQuestions ||
-                  "—",
-              },
-              { label: "Duration", value: `${test.durationMins}m` },
-              { label: "Marks", value: test.totalMarks },
-            ].map((s) => (
-              <div
-                key={s.label}
-                className="rounded-xl text-center py-3"
-                style={{ background: "rgba(255,255,255,0.06)" }}
-              >
-                <p className="text-lg font-bold text-white">{s.value}</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">{s.label}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Perks */}
-          <ul className="mt-5 space-y-2">
-            {[
-              "Free to attempt — no payment needed",
-              "Results within 24 hours",
-              "Win fee waivers & cash prizes",
-              Number(test.price) === 0 ? "No registration fee" : null,
-            ]
-              .filter(Boolean)
-              .map((b) => (
-                <li
-                  key={b}
-                  className="flex items-center gap-2 text-sm text-slate-200"
-                >
-                  <MdCheckCircle
-                    size={16}
-                    className="flex-shrink-0 text-emerald-400"
-                  />
-                  {b}
-                </li>
-              ))}
-          </ul>
-
-          {/* Timer */}
-          {state === "live" && daysLeft !== null && (
-            <div
-              className="mt-4 flex items-center gap-2 rounded-xl px-4 py-2.5"
-              style={{
-                background: "rgba(239,68,68,0.12)",
-                border: "1px solid rgba(239,68,68,0.2)",
-              }}
-            >
-              <MdTimer size={14} className="text-red-400" />
-              <span className="text-sm text-red-300">
-                <strong className="text-white">{daysLeft} days</strong>{" "}
-                remaining to register
-              </span>
-            </div>
-          )}
-
-          {state === "upcoming" && test.scheduledAt && (
-            <div
-              className="mt-4 flex items-center gap-2 rounded-xl px-4 py-2.5"
-              style={{
-                background: "rgba(251,191,36,0.08)",
-                border: "1px solid rgba(251,191,36,0.2)",
-              }}
-            >
-              <MdTimer size={14} className="text-amber-400" />
-              <span className="text-sm text-amber-200">
-                Opens on{" "}
-                <strong className="text-white">
-                  {new Date(test.scheduledAt).toLocaleDateString("en-IN", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
-                </strong>
-              </span>
-            </div>
           )}
 
           {/* CTA */}
           <Link
             href={`/test/${test.id}`}
             onClick={onClose}
-            className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl py-4 text-sm font-extrabold text-slate-900 transition hover:-translate-y-0.5 hover:brightness-110"
-            style={{
-              background: "linear-gradient(90deg, #fbbf24, #f97316)",
-              boxShadow: "0 10px 30px -8px rgba(251,191,36,0.5)",
-            }}
+            className="
+              mt-3 flex items-center justify-center gap-1.5
+              rounded-xl bg-gradient-to-r from-amber-400 to-orange-500
+              px-4 py-2.5 text-[13px] font-black text-slate-900
+              shadow-lg shadow-amber-500/30
+              transition hover:brightness-110
+            "
           >
-            {state === "upcoming" ? "Get Notified" : "Attempt Free Now"}
-            <MdArrowForward size={18} />
+            {cta}
+            <MdArrowForward size={14} />
           </Link>
-
-          <p className="mt-3 text-center text-xs text-slate-500">
-            No credit card · Free test · Open for all students
-          </p>
         </div>
       </div>
+
+      <style>{`
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(20px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }
