@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { successResponse, errorResponse } from "@/lib/api";
 import { getStudent } from "@/lib/auth";
+import { decodeAttempt, encodeAttempt, encodeTest } from "@/lib/hashid"; // ← add
 
 export async function GET(request, { params }) {
   try {
@@ -8,9 +9,14 @@ export async function GET(request, { params }) {
     if (!student) return errorResponse("Login required", 401);
 
     const { id: idParam } = await params;
-    const attemptId = parseInt(idParam);
-    const attempt = await prisma.testAttempt.findUnique({
-      where: { id: attemptId },
+    const attemptId = decodeAttempt(idParam); // ← was parseInt
+    if (!attemptId) return errorResponse("Not found", 404); // ← null check
+
+    const attempt = await prisma.testAttempt.findFirst({
+      where: {
+        id: attemptId,
+        studentId: student.id,
+      },
       include: {
         test: {
           include: {
@@ -33,8 +39,7 @@ export async function GET(request, { params }) {
       },
     });
 
-    if (!attempt || attempt.studentId !== student.id)
-      return errorResponse("Not found", 404);
+    if (!attempt) return errorResponse("Not found", 404);
 
     // Subject wise breakdown
     const subjectMap = {};
@@ -72,13 +77,27 @@ export async function GET(request, { params }) {
       where: { testId: attempt.testId, status: "SUBMITTED" },
       orderBy: { score: "desc" },
       take: 10,
-      include: { student: { select: { name: true } } },
+      include: { student: { select: { id: true, name: true } } },
     });
 
+    // Encode IDs before sending to client
+    const encodedAttempt = {
+      // ← encode block
+      ...attempt,
+      id: encodeAttempt(attempt.id),
+      test: attempt.test
+        ? { ...attempt.test, id: encodeTest(attempt.test.id) }
+        : null,
+    };
+    const encodedLeaderboard = leaderboard.map((l) => ({
+      ...l,
+      id: encodeAttempt(l.id),
+    }));
+
     return successResponse({
-      attempt,
+      attempt: encodedAttempt,
       subjectBreakdown: subjectMap,
-      leaderboard,
+      leaderboard: encodedLeaderboard,
     });
   } catch (error) {
     console.error(error);

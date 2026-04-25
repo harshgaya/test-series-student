@@ -114,10 +114,7 @@ export default function LoginModal({ onClose, onSuccess }) {
         setStep("register");
         return;
       }
-      localStorage.setItem(
-        "iitneet_student",
-        JSON.stringify(data.data.student),
-      );
+
       toast.success("Welcome back! 👋");
       onSuccess?.(data.data.student);
       onClose?.();
@@ -152,10 +149,7 @@ export default function LoginModal({ onClose, onSuccess }) {
         toast.error(data.error);
         return;
       }
-      localStorage.setItem(
-        "iitneet_student",
-        JSON.stringify(data.data.student),
-      );
+
       toast.success("Welcome to IITNEET! 🎉");
       onSuccess?.(data.data.student);
       onClose?.();

@@ -161,8 +161,8 @@ export default function CoursePage() {
   }, [id]);
 
   async function handleEnroll() {
-    const student = localStorage.getItem("iitneet_student");
-    if (!student) {
+    const meRes = await fetch("/api/me");
+    if (!meRes.ok) {
       setShowLogin(true);
       return;
     }
@@ -259,8 +259,7 @@ export default function CoursePage() {
         <LoginModal
           onClose={() => setShowLogin(false)}
           onSuccess={() => {
-            setShowLogin(false);
-            handleEnroll();
+            window.location.href = `/course/${id}`;
           }}
         />
       )}

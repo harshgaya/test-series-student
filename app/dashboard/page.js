@@ -55,28 +55,28 @@ export default function DashboardPage() {
   const [daysLeft, setDaysLeft] = useState(null);
 
   useEffect(() => {
-    const s = localStorage.getItem("iitneet_student");
-    if (!s) {
-      router.push("/login");
-      return;
-    }
-    const parsed = JSON.parse(s);
-    setStudent(parsed);
-
-    // Exam countdown
-    const year = parsed.targetYear || 2026;
-    const examDate = new Date(`${year}-05-01`);
-    const diff = Math.ceil((examDate - new Date()) / (1000 * 60 * 60 * 24));
-    if (diff > 0) setDaysLeft(diff);
-
+    // Proxy guarantees we're logged in. Fetch student + everything in parallel.
     Promise.all([
+      fetch("/api/me").then((r) => (r.ok ? r.json() : null)),
       fetch("/api/student/purchases").then((r) => r.json()),
       fetch("/api/student/enrollments").then((r) => r.json()),
       fetch("/api/announcements").then((r) => r.json()),
       fetch("/api/student/attempts").then((r) => r.json()),
       fetch("/api/exams").then((r) => r.json()),
     ])
-      .then(([p, e, a, at, ex]) => {
+      .then(([me, p, e, a, at, ex]) => {
+        if (me?.success) {
+          const parsed = me.data.student;
+          setStudent(parsed);
+
+          // Exam countdown
+          const year = parsed.targetYear || 2026;
+          const examDate = new Date(`${year}-05-01`);
+          const diff = Math.ceil(
+            (examDate - new Date()) / (1000 * 60 * 60 * 24),
+          );
+          if (diff > 0) setDaysLeft(diff);
+        }
         if (p.success) setPurchases(p.data);
         if (e.success) setEnrollments(e.data);
         if (a.success) setAnnouncements(a.data);

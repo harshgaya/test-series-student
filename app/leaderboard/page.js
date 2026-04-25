@@ -44,10 +44,10 @@ export default function LeaderboardPage() {
 
   // ── Initial load ────────────────────────────────────────────
   useEffect(() => {
-    const s = localStorage.getItem("iitneet_student");
-    if (s) setStudent(JSON.parse(s));
-
     Promise.all([
+      fetch("/api/me")
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null),
       fetch("/api/exams")
         .then((r) => r.json())
         .catch(() => ({ success: false })),
@@ -58,7 +58,8 @@ export default function LeaderboardPage() {
         .then((r) => r.json())
         .catch(() => ({ success: false })),
     ])
-      .then(([e, at, t]) => {
+      .then(([me, e, at, t]) => {
+        if (me?.success) setStudent(me.data.student);
         if (e.success) setExams(e.data || []);
 
         let att = [];
@@ -68,7 +69,6 @@ export default function LeaderboardPage() {
         }
 
         if (t.success) {
-          // Defensive — handle both {data: {tests: [...]}} and {data: [...]} response shapes
           const testsList =
             t.data?.tests || (Array.isArray(t.data) ? t.data : []);
           setTests(testsList);

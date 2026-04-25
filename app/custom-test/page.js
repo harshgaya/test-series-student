@@ -117,31 +117,29 @@ export default function CustomTestPage() {
   }, [showExamPicker]);
 
   // ── Auth + initial load ──────────────────────────────────────
+  // ── Initial load (auth handled by proxy/middleware) ──────────
   useEffect(() => {
-    const s = localStorage.getItem("iitneet_student");
-    if (!s) {
-      router.push("/login");
-      return;
-    }
-    const student = JSON.parse(s);
+    // Fetch student via cookie + exams in parallel
+    Promise.all([
+      fetch("/api/me").then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/exams").then((r) => r.json()),
+    ]).then(([me, e]) => {
+      if (!e.success) return;
+      setExams(e.data);
 
-    // Exams (required)
-    fetch("/api/exams")
-      .then((r) => r.json())
-      .then((e) => {
-        if (!e.success) return;
-        setExams(e.data);
-        const target =
-          student.targetExamId ??
-          e.data.find(
-            (x) =>
-              x.name === student.targetExam || x.slug === student.targetExam,
-          )?.id ??
-          e.data[0]?.id;
-        setExamId(target);
-      });
+      // Pick exam from student profile (silent default)
+      const student = me?.success ? me.data.student : null;
+      const target =
+        student?.targetExamId ??
+        e.data.find(
+          (x) =>
+            x.name === student?.targetExam || x.slug === student?.targetExam,
+        )?.id ??
+        e.data[0]?.id;
+      setExamId(target);
+    });
 
-    // Stats (optional — endpoint may not exist yet. All sources stay unlocked if this fails.)
+    // Stats (optional)
     fetch("/api/student/practice-stats")
       .then((r) => (r.ok ? r.json() : null))
       .then((st) => {

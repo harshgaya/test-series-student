@@ -24,25 +24,28 @@ export default function ProfilePage() {
   const [daysLeft, setDaysLeft] = useState(null);
 
   useEffect(() => {
-    const s = localStorage.getItem("iitneet_student");
-    if (!s) {
-      router.push("/login");
-      return;
-    }
-    const p = JSON.parse(s);
-    setStudent(p);
-    setName(p.name || "");
-    setTargetExam(String(p.targetExamId || ""));
-    setTargetYear(String(p.targetYear || 2026));
-    fetch("/api/exams")
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.success) setExams(d.data);
-      });
-    const year = p.targetYear || 2026;
-    const examDate = new Date(`${year}-05-01`);
-    const diff = Math.ceil((examDate - new Date()) / 86400000);
-    setDaysLeft(diff > 0 ? diff : null);
+    Promise.all([
+      fetch("/api/me")
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null),
+      fetch("/api/exams")
+        .then((r) => r.json())
+        .catch(() => ({ success: false })),
+    ]).then(([me, ex]) => {
+      if (ex.success) setExams(ex.data);
+      if (me?.success) {
+        const p = me.data.student;
+        setStudent(p);
+        setName(p.name || "");
+        setTargetExam(String(p.targetExamId || ""));
+        setTargetYear(String(p.targetYear || 2026));
+
+        const year = p.targetYear || 2026;
+        const examDate = new Date(`${year}-05-01`);
+        const diff = Math.ceil((examDate - new Date()) / 86400000);
+        setDaysLeft(diff > 0 ? diff : null);
+      }
+    });
   }, []);
 
   async function handleSave() {

@@ -390,14 +390,6 @@ export default function AttemptPage() {
   }, []);
 
   useEffect(() => {
-    const student = localStorage.getItem("iitneet_student");
-    if (!student) {
-      router.replace("/login?redirect=/attempt/" + id);
-      return;
-    }
-  }, [id]);
-
-  useEffect(() => {
     fetch("/api/attempt/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -515,7 +507,7 @@ export default function AttemptPage() {
         }),
       });
       const d = await res.json();
-      if (d.success) router.push(`/result/${attempt.id}`);
+      if (d.success) router.replace(`/result/${attempt.id}`);
       else {
         toast.error(d.error);
         setSubmitting(false);

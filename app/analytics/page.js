@@ -53,11 +53,6 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const s = localStorage.getItem("iitneet_student");
-    if (!s) {
-      router.push("/login");
-      return;
-    }
     Promise.all([
       fetch("/api/student/analytics").then((r) => r.json()),
       fetch("/api/student/attempts").then((r) => r.json()),

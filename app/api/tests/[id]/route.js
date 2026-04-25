@@ -1,11 +1,14 @@
 import { prisma } from "@/lib/prisma";
 import { successResponse, errorResponse } from "@/lib/api";
 import { getStudent } from "@/lib/auth";
+import { encodeTest, decodeTest, encodeAttempt } from "@/lib/hashid";
 
 export async function GET(request, { params }) {
   try {
     const { id: idParam } = await params;
-    const id = parseInt(idParam);
+    const id = decodeTest(idParam); // ← was parseInt
+    if (!id) return errorResponse("Test not found", 404); // ← invalid hash
+
     const student = await getStudent();
 
     const test = await prisma.test.findUnique({
@@ -60,7 +63,24 @@ export async function GET(request, { params }) {
       _count: { id: true },
     });
 
-    return successResponse({ test, purchased, attempts, leaderboard, stats });
+    // Encode IDs for client
+    const encodedTest = { ...test, id: encodeTest(test.id) };
+    const encodedAttempts = attempts.map((a) => ({
+      ...a,
+      id: encodeAttempt(a.id),
+    }));
+    const encodedLeaderboard = leaderboard.map((l) => ({
+      ...l,
+      id: encodeAttempt(l.id),
+    }));
+
+    return successResponse({
+      test: encodedTest,
+      purchased,
+      attempts: encodedAttempts,
+      leaderboard: encodedLeaderboard,
+      stats,
+    });
   } catch (error) {
     console.error(error);
     return errorResponse("Failed to fetch test", 500);

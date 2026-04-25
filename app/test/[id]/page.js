@@ -232,7 +232,12 @@ export default function TestPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
-    setIsLoggedIn(!!localStorage.getItem("iitneet_student"));
+    // Check login via cookie (server-side)
+    fetch("/api/me")
+      .then((r) => r.json())
+      .then((d) => setIsLoggedIn(d.success))
+      .catch(() => setIsLoggedIn(false));
+
     fetch(`/api/tests/${id}`)
       .then((r) => r.json())
       .then((d) => {
@@ -241,6 +246,7 @@ export default function TestPage() {
       })
       .catch(() => setError("Could not load test. Check your connection."))
       .finally(() => setLoading(false));
+
     fetch("/api/exams")
       .then((r) => r.json())
       .then((d) => {
@@ -260,7 +266,10 @@ export default function TestPage() {
   function handleLoginSuccess() {
     setIsLoggedIn(true);
     setShowLogin(false);
-    if (pendingAction === "attempt") router.push(`/attempt/${id}`);
+    if (pendingAction === "attempt") {
+      window.location.href = `/attempt/${id}`;
+      return;
+    }
     if (pendingAction === "buy") startPayment();
     setPendingAction(null);
   }

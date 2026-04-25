@@ -59,11 +59,13 @@ export default function Navbar({ exams = [] }) {
 
   // Read student from localStorage
   useEffect(() => {
-    const s = localStorage.getItem("iitneet_student");
-    if (s)
-      try {
-        setStudent(JSON.parse(s));
-      } catch {}
+    fetch("/api/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.success) setStudent(d.data.student);
+        else setStudent(null);
+      })
+      .catch(() => setStudent(null));
   }, [pathname]);
 
   // Scroll shadow
@@ -98,11 +100,10 @@ export default function Navbar({ exams = [] }) {
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
-    localStorage.removeItem("iitneet_student");
     setStudent(null);
     setUserOpen(false);
     setMenuOpen(false);
-    router.push("/");
+    window.location.href = "/";
   }
 
   // Hide on attempt page

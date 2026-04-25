@@ -159,12 +159,9 @@ function LoginForm() {
         setStep("register");
         return;
       }
-      localStorage.setItem(
-        "iitneet_student",
-        JSON.stringify(data.data.student),
-      );
+
       toast.success("Welcome back! 👋");
-      router.push(redirect);
+      window.location.href = redirect;
     } finally {
       setLoading(false);
     }
@@ -196,12 +193,9 @@ function LoginForm() {
         toast.error(data.error);
         return;
       }
-      localStorage.setItem(
-        "iitneet_student",
-        JSON.stringify(data.data.student),
-      );
+
       toast.success("Welcome to IITNEET! 🎉");
-      router.push(redirect);
+      window.location.href = redirect;
     } finally {
       setLoading(false);
     }
