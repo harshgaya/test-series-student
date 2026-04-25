@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { signToken } from "@/lib/jwt"; // ← from /jwt, not /auth
+import { signToken } from "@/lib/jwt";
 import { successResponse, errorResponse } from "@/lib/api";
 import { COOKIE_NAME } from "@/lib/constants";
 import { cookies } from "next/headers";

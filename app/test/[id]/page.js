@@ -218,7 +218,6 @@ function PageSkeleton({ exams }) {
   );
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
 export default function TestPage() {
   const { id } = useParams();
   const router = useRouter();
