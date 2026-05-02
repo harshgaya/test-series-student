@@ -250,7 +250,7 @@ export default function ExamPage() {
                   return (
                     <Link
                       key={e.id}
-                      href={`/exams/${e.slug}`}
+                      href={`/exam/${e.slug}`}
                       className={`rounded-full px-4 py-1.5 text-[13px] font-semibold transition ${
                         isActive
                           ? "bg-white text-slate-800"
