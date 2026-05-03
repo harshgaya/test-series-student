@@ -312,7 +312,7 @@ model AttemptAnswer {
   attempt  TestAttempt @relation(fields: [attemptId],  references: [id], onDelete: Cascade)
   question Question    @relation(fields: [questionId], references: [id])
 
-  @@index([attemptId])
+  @@unique([attemptId, questionId])    // ← ADD THIS
   @@index([questionId])
   @@map("attempt_answers")
 }

@@ -10,8 +10,6 @@ import {
   MdArrowBack,
   MdArrowForward,
   MdWarning,
-  MdChevronRight,
-  MdChevronLeft,
   MdCheck,
   MdRefresh,
   MdOutlineBookmarkBorder,
@@ -20,7 +18,15 @@ import {
 import ReportModal from "@/components/ReportModal";
 import { MAX_TAB_SWITCHES } from "@/lib/constants";
 
-// ── Math renderer ─────────────────────────────────────────────────────────────
+// Escape HTML so broken LaTeX shows as readable text, never as raw tags
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+// Math renderer
 function renderMath(value, katex) {
   if (!value || !katex) return value || "";
   try {
@@ -34,7 +40,7 @@ function renderMath(value, katex) {
           strict: false,
         });
       } catch {
-        return m;
+        return `<span class="latex-fallback">${escapeHtml(m)}</span>`;
       }
     });
     r = r.replace(/\$([^$\n]+)\$/g, (_, m) => {
@@ -46,10 +52,10 @@ function renderMath(value, katex) {
           strict: false,
         });
       } catch {
-        return m;
+        return `<span class="latex-fallback">${escapeHtml(m)}</span>`;
       }
     });
-    if (!r.includes("$") && /\\[a-zA-Z]/.test(r)) {
+    if (!r.includes("$") && !r.includes("<") && /\\[a-zA-Z]/.test(r)) {
       try {
         return katex.renderToString(r.trim(), {
           throwOnError: false,
@@ -61,11 +67,11 @@ function renderMath(value, katex) {
     }
     return r.replace(/\n/g, "<br/>");
   } catch {
-    return value;
+    return escapeHtml(value);
   }
 }
 
-// ── Question status → palette colour ─────────────────────────────────────────
+// Palette colour
 function getPaletteStyle(status, active) {
   if (active)
     return "bg-teal-600 text-white ring-2 ring-teal-400 ring-offset-1";
@@ -77,7 +83,7 @@ function getPaletteStyle(status, active) {
   return "bg-slate-100 text-slate-500";
 }
 
-// ── Timer ─────────────────────────────────────────────────────────────────────
+// Timer
 function Timer({ totalSecs, onTimeUp }) {
   const [secs, setSecs] = useState(totalSecs);
   useEffect(() => {
@@ -110,7 +116,7 @@ function Timer({ totalSecs, onTimeUp }) {
   );
 }
 
-// ── Tab switch warning modal ───────────────────────────────────────────────────
+// Tab switch warning
 function TabWarning({ count, max, onClose }) {
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
@@ -125,7 +131,7 @@ function TabWarning({ count, max, onClose }) {
           You switched tabs or minimised the browser.
         </p>
         <p className="mb-6 text-sm font-bold text-red-600">
-          Warning {count}/{max} — Test auto-submits after {max} switches
+          Warning {count}/{max} - Test auto-submits after {max} switches
         </p>
         <div className="mb-3 h-2 rounded-full bg-slate-100">
           <div
@@ -144,7 +150,7 @@ function TabWarning({ count, max, onClose }) {
   );
 }
 
-// ── Submit confirmation modal ─────────────────────────────────────────────────
+// Submit confirmation modal
 function SubmitModal({
   answered,
   total,
@@ -200,7 +206,8 @@ function SubmitModal({
         <div className="flex gap-3">
           <button
             onClick={onCancel}
-            className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            disabled={submitting}
+            className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
           >
             Continue Test
           </button>
@@ -217,7 +224,7 @@ function SubmitModal({
   );
 }
 
-// ── Question Palette ──────────────────────────────────────────────────────────
+// Question Palette
 function Palette({
   questions,
   current,
@@ -229,12 +236,19 @@ function Palette({
   onClose,
   show,
 }) {
-  const answeredCount = Object.keys(answers).length;
+  const answeredCount = Object.keys(answers).filter((k) => {
+    const a = answers[k];
+    return (
+      a !== undefined &&
+      a !== "" &&
+      a !== null &&
+      (!Array.isArray(a) || a.length > 0)
+    );
+  }).length;
   const markedCount = Object.values(marked).filter(Boolean).length;
 
   return (
     <>
-      {/* Mobile backdrop */}
       {show && (
         <div
           className="fixed inset-0 z-30 bg-black/40 lg:hidden"
@@ -250,12 +264,10 @@ function Palette({
         rounded-t-3xl lg:rounded-none
       `}
       >
-        {/* Handle (mobile) */}
         <div className="flex justify-center pt-3 pb-1 lg:hidden">
           <div className="h-1 w-12 rounded-full bg-slate-200" />
         </div>
 
-        {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
           <div className="flex items-center gap-2">
             <MdGridView size={16} className="text-slate-500" />
@@ -269,7 +281,6 @@ function Palette({
           </button>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-3 divide-x divide-slate-100 border-b border-slate-100">
           {[
             {
@@ -293,7 +304,6 @@ function Palette({
           ))}
         </div>
 
-        {/* Legend */}
         <div className="grid grid-cols-2 gap-1.5 border-b border-slate-100 px-4 py-3">
           {[
             { style: "bg-emerald-500", label: "Answered" },
@@ -309,7 +319,6 @@ function Palette({
           ))}
         </div>
 
-        {/* Grid */}
         <div className="flex-1 overflow-y-auto p-4">
           <div className="grid grid-cols-6 gap-1.5 sm:grid-cols-7 lg:grid-cols-5 xl:grid-cols-6">
             {questions.map((_, i) => {
@@ -332,7 +341,7 @@ function Palette({
   );
 }
 
-// ── Option button ─────────────────────────────────────────────────────────────
+// Option button
 function OptionBtn({ label, text, selected, multi, onClick, katex }) {
   return (
     <button
@@ -364,7 +373,7 @@ function OptionBtn({ label, text, selected, multi, onClick, katex }) {
   );
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
+// Main
 export default function AttemptPage() {
   const { id } = useParams();
   const router = useRouter();
@@ -383,12 +392,19 @@ export default function AttemptPage() {
   const [katex, setKatex] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [reportId, setReportId] = useState(null);
-  const startTime = useRef(Date.now());
 
+  const startTime = useRef(Date.now());
+  const submittedRef = useRef(false);
+
+  // localStorage key for this attempt
+  const storageKey = attempt ? `attempt_${attempt.id}` : null;
+
+  // Load KaTeX
   useEffect(() => {
     import("katex").then((k) => setKatex(k.default));
   }, []);
 
+  // Start or resume attempt - prefer localStorage over server data
   useEffect(() => {
     fetch("/api/attempt/start", {
       method: "POST",
@@ -408,14 +424,48 @@ export default function AttemptPage() {
           durationMins: d.data.durationMins,
           marksCorrect: d.data.marksCorrect,
           negativeMarking: d.data.negativeMarking,
+          testTitle: d.data.testTitle,
         });
-        if (d.data.resumed && d.data.attempt.answers) {
+
+        // Restore from localStorage if present (newest, most accurate)
+        let restoredFromLocal = false;
+        try {
+          const cached = localStorage.getItem(`attempt_${d.data.attempt.id}`);
+          if (cached) {
+            const state = JSON.parse(cached);
+            if (state && state.answers) {
+              setAnswers(state.answers || {});
+              setMarked(state.marked || {});
+              setCurrent(state.current || 0);
+              setVisited(state.visited || { 0: true });
+              if (Object.keys(state.answers).length > 0) {
+                toast.success("Restored your previous answers", {
+                  duration: 2500,
+                });
+              }
+              restoredFromLocal = true;
+            }
+          }
+        } catch {}
+
+        // Otherwise fall back to server data (cross-device resume)
+        if (!restoredFromLocal && d.data.resumed && d.data.attempt.answers) {
           const saved = {};
+          const savedMarked = {};
           d.data.attempt.answers.forEach((a) => {
-            saved[a.questionId] =
-              a.selectedOption || a.integerAnswer || a.selectedOptions;
+            const val =
+              a.selectedOption ||
+              (a.selectedOptions && a.selectedOptions.length > 0
+                ? a.selectedOptions
+                : null) ||
+              a.integerAnswer;
+            if (val !== null && val !== undefined) {
+              saved[a.questionId] = val;
+            }
+            if (a.isMarked) savedMarked[a.questionId] = true;
           });
           setAnswers(saved);
+          setMarked(savedMarked);
         }
       })
       .catch(() => {
@@ -424,6 +474,36 @@ export default function AttemptPage() {
       })
       .finally(() => setLoading(false));
   }, [id]);
+
+  // Save state to localStorage on every change. Free, instant, no DB hit.
+  useEffect(() => {
+    if (!storageKey) return;
+    try {
+      const state = {
+        answers,
+        marked,
+        current,
+        visited,
+        savedAt: Date.now(),
+      };
+      localStorage.setItem(storageKey, JSON.stringify(state));
+    } catch {}
+  }, [answers, marked, current, visited, storageKey]);
+
+  // Warn before leaving the page
+  useEffect(() => {
+    function onBeforeUnload(e) {
+      if (submittedRef.current) return;
+      if (Object.keys(answers).length > 0) {
+        e.preventDefault();
+        e.returnValue =
+          "Test in progress. Your answers are saved locally but you may lose your place.";
+        return e.returnValue;
+      }
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [answers]);
 
   // Tab switch detection
   useEffect(() => {
@@ -454,13 +534,6 @@ export default function AttemptPage() {
     };
   }, []);
 
-  // Auto-save every 30s
-  useEffect(() => {
-    if (!attempt) return;
-    const t = setInterval(saveCurrentAnswer, 30000);
-    return () => clearInterval(t);
-  }, [attempt, answers, current]);
-
   // Keyboard navigation
   useEffect(() => {
     function onKey(e) {
@@ -472,29 +545,69 @@ export default function AttemptPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [current, questions.length]);
 
-  async function saveCurrentAnswer() {
-    if (!attempt || !questions[current]) return;
-    const q = questions[current];
-    const a = answers[q.id];
-    if (!a) return;
-    await fetch("/api/attempt/save-answer", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        attemptId: attempt.id,
-        questionId: q.id,
-        selectedOption: typeof a === "string" ? a : null,
-        selectedOptions: Array.isArray(a) ? a : [],
-        integerAnswer: typeof a === "number" ? a : null,
-        isMarked: marked[q.id] || false,
-        timeSpentSecs: Math.floor((Date.now() - startTime.current) / 1000),
-      }),
+  // Bulk-save all answers to DB. Called only on submit.
+  async function saveAllAnswersToDB() {
+    if (!attempt) return { ok: true, failed: 0 };
+    const entries = Object.entries(answers).filter(([, val]) => {
+      return (
+        val !== undefined &&
+        val !== "" &&
+        val !== null &&
+        (!Array.isArray(val) || val.length > 0)
+      );
     });
+    if (entries.length === 0) return { ok: true, failed: 0 };
+
+    const timeSpent = Math.floor((Date.now() - startTime.current) / 1000);
+
+    const results = await Promise.allSettled(
+      entries.map(([qid, val]) => {
+        const isString = typeof val === "string";
+        const isArray = Array.isArray(val);
+        const isNumeric = isString && val !== "" && !isNaN(Number(val));
+
+        return fetch("/api/attempt/save-answer", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            attemptId: attempt.id,
+            questionId: parseInt(qid),
+            selectedOption: isString && !isNumeric ? val : null,
+            selectedOptions: isArray ? val : [],
+            integerAnswer:
+              typeof val === "number" ? val : isNumeric ? Number(val) : null,
+            isMarked: marked[qid] || false,
+            timeSpentSecs: timeSpent,
+          }),
+        }).then((r) => {
+          if (!r.ok) throw new Error("save failed");
+          return r.json();
+        });
+      }),
+    );
+
+    const failed = results.filter((r) => r.status === "rejected").length;
+    return { ok: failed === 0, failed };
   }
 
   async function handleSubmit(auto = false, switches = tabSwitches) {
     if (submitting) return;
     setSubmitting(true);
+
+    // 1. Save all answers to DB (one batch, only on submit)
+    const saveResult = await saveAllAnswersToDB();
+
+    if (!saveResult.ok && !auto) {
+      const proceed = window.confirm(
+        `${saveResult.failed} answer(s) could not be saved due to network. Submit anyway? Those answers may be lost.`,
+      );
+      if (!proceed) {
+        setSubmitting(false);
+        return;
+      }
+    }
+
+    // 2. Trigger submit / scoring
     try {
       const res = await fetch("/api/attempt/submit", {
         method: "POST",
@@ -507,13 +620,19 @@ export default function AttemptPage() {
         }),
       });
       const d = await res.json();
-      if (d.success) router.replace(`/result/${attempt.id}`);
-      else {
-        toast.error(d.error);
+      if (d.success) {
+        // Clear localStorage cache after successful submit
+        try {
+          if (storageKey) localStorage.removeItem(storageKey);
+        } catch {}
+        submittedRef.current = true;
+        router.replace(`/result/${attempt.id}`);
+      } else {
+        toast.error(d.error || "Submit failed");
         setSubmitting(false);
       }
     } catch {
-      toast.error("Submit failed");
+      toast.error("Submit failed - check connection and try again");
       setSubmitting(false);
     }
   }
@@ -529,6 +648,7 @@ export default function AttemptPage() {
     const hasAns =
       answers[qid] !== undefined &&
       answers[qid] !== "" &&
+      answers[qid] !== null &&
       (Array.isArray(answers[qid]) ? answers[qid].length > 0 : true);
     if (hasAns && marked[qid]) return "answered-marked";
     if (hasAns) return "answered";
@@ -540,14 +660,18 @@ export default function AttemptPage() {
   const q = questions[current];
   const answeredCount = Object.keys(answers).filter((k) => {
     const a = answers[k];
-    return a !== undefined && a !== "" && (!Array.isArray(a) || a.length > 0);
+    return (
+      a !== undefined &&
+      a !== "" &&
+      a !== null &&
+      (!Array.isArray(a) || a.length > 0)
+    );
   }).length;
   const markedCount = Object.values(marked).filter(Boolean).length;
   const progress = Math.round(
     (answeredCount / Math.max(questions.length, 1)) * 100,
   );
 
-  // ── Loading ──────────────────────────────────────────────────────────────────
   if (loading)
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-50">
@@ -558,7 +682,6 @@ export default function AttemptPage() {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-slate-50 select-none">
-      {/* Modals */}
       {reportId && (
         <ReportModal questionId={reportId} onClose={() => setReportId(null)} />
       )}
@@ -580,9 +703,8 @@ export default function AttemptPage() {
         />
       )}
 
-      {/* ── TOP BAR ── */}
+      {/* TOP BAR */}
       <header className="flex h-14 flex-shrink-0 items-center justify-between border-b border-slate-200 bg-white px-3 sm:px-5">
-        {/* Left: logo + test name */}
         <div className="flex items-center gap-3 min-w-0">
           <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-teal-600 to-cyan-600 text-[11px] font-extrabold text-white">
             IN
@@ -592,17 +714,15 @@ export default function AttemptPage() {
               {testInfo.testTitle || questions[0]?.chapter?.name || "Test"}
             </p>
             <p className="text-[11px] text-slate-400">
-              Q {current + 1}/{questions.length} · +{testInfo.marksCorrect}/
+              Q {current + 1}/{questions.length} . +{testInfo.marksCorrect}/
               {testInfo.negativeMarking}
             </p>
           </div>
-          {/* Mobile: just Q counter */}
           <span className="text-sm font-bold text-slate-700 sm:hidden">
             Q {current + 1}/{questions.length}
           </span>
         </div>
 
-        {/* Center: progress bar (hidden on mobile) */}
         <div className="hidden flex-1 items-center gap-3 px-6 md:flex">
           <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
             <div
@@ -615,11 +735,10 @@ export default function AttemptPage() {
           </span>
         </div>
 
-        {/* Right: tab warn + timer + palette toggle + submit */}
         <div className="flex items-center gap-2">
           {tabSwitches > 0 && (
             <span className="hidden items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-600 ring-1 ring-red-200 sm:flex">
-              ⚠️ {tabSwitches}/{MAX_TAB_SWITCHES}
+              {tabSwitches}/{MAX_TAB_SWITCHES}
             </span>
           )}
 
@@ -630,7 +749,6 @@ export default function AttemptPage() {
             />
           )}
 
-          {/* Palette toggle (mobile) */}
           <button
             onClick={() => setShowPalette((p) => !p)}
             className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 lg:hidden"
@@ -647,11 +765,9 @@ export default function AttemptPage() {
         </div>
       </header>
 
-      {/* ── BODY ── */}
+      {/* BODY */}
       <div className="flex flex-1 overflow-hidden">
-        {/* ── QUESTION AREA ── */}
         <main className="flex flex-1 flex-col overflow-hidden">
-          {/* Question header strip */}
           <div className="flex flex-shrink-0 items-center justify-between border-b border-slate-100 bg-white px-4 py-2 sm:px-6">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="rounded-full bg-teal-600 px-3 py-1 text-[12px] font-bold text-white">
@@ -681,10 +797,8 @@ export default function AttemptPage() {
             </span>
           </div>
 
-          {/* Scrollable question content */}
           <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6">
             <div className="mx-auto max-w-3xl space-y-4">
-              {/* Question card */}
               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                 {q?.questionImageUrl && (
                   <img
@@ -707,7 +821,6 @@ export default function AttemptPage() {
                 )}
               </div>
 
-              {/* MCQ */}
               {q?.questionType === "MCQ" && (
                 <div className="space-y-2.5">
                   {q.options?.map((opt) => (
@@ -726,7 +839,6 @@ export default function AttemptPage() {
                 </div>
               )}
 
-              {/* Multi-correct */}
               {q?.questionType === "MULTI_CORRECT" && (
                 <div className="space-y-2.5">
                   <p className="text-[12px] font-semibold text-slate-400">
@@ -759,7 +871,6 @@ export default function AttemptPage() {
                 </div>
               )}
 
-              {/* Integer */}
               {q?.questionType === "INTEGER" && (
                 <div className="rounded-2xl border border-slate-200 bg-white p-5">
                   <p className="mb-3 text-[13px] font-semibold text-slate-500">
@@ -768,7 +879,7 @@ export default function AttemptPage() {
                   <input
                     type="number"
                     placeholder="0"
-                    value={answers[q.id] || ""}
+                    value={answers[q.id] ?? ""}
                     onChange={(e) =>
                       setAnswers((a) => ({ ...a, [q.id]: e.target.value }))
                     }
@@ -780,10 +891,9 @@ export default function AttemptPage() {
             </div>
           </div>
 
-          {/* ── BOTTOM NAV BAR ── */}
+          {/* BOTTOM NAV */}
           <div className="flex-shrink-0 border-t border-slate-200 bg-white px-4 py-3 sm:px-6">
             <div className="mx-auto flex max-w-3xl items-center justify-between gap-2">
-              {/* Left actions */}
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => q && setReportId(q.id)}
@@ -815,6 +925,7 @@ export default function AttemptPage() {
 
                 {answers[q?.id] !== undefined &&
                   answers[q?.id] !== "" &&
+                  answers[q?.id] !== null &&
                   !(
                     Array.isArray(answers[q?.id]) && answers[q?.id].length === 0
                   ) && (
@@ -834,7 +945,6 @@ export default function AttemptPage() {
                   )}
               </div>
 
-              {/* Right: Prev / Next */}
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => current > 0 && goTo(current - 1)}
@@ -866,7 +976,6 @@ export default function AttemptPage() {
           </div>
         </main>
 
-        {/* ── PALETTE: desktop always visible, mobile sheet ── */}
         <Palette
           questions={questions}
           current={current}
@@ -881,12 +990,8 @@ export default function AttemptPage() {
           onClose={() => setShowPalette(false)}
           show={showPalette}
         />
-
-        {/* Desktop palette toggle button (collapsed state) — shown as a tab on the right edge when palette is hidden on desktop */}
-        {/* Desktop: palette is always rendered via CSS, the button below is just for mobile */}
       </div>
 
-      {/* Palette toggle FAB — only on mobile when palette is closed */}
       {!showPalette && (
         <button
           onClick={() => setShowPalette(true)}

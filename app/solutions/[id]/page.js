@@ -45,7 +45,7 @@ function renderMath(value, katex) {
         return m;
       }
     });
-    if (!r.includes("$") && /\\[a-zA-Z]/.test(r)) {
+    if (!r.includes("$") && !r.includes("<") && /\\[a-zA-Z]/.test(r)) {
       try {
         return katex.renderToString(r.trim(), {
           throwOnError: false,
